@@ -1416,7 +1416,7 @@ const PropertiesPage = () => {
                 <div>
                    <label className="block text-sm font-bold text-slate-700 mb-2">Comuna</label>
                    <select required className="w-full p-3 border rounded-xl text-base bg-white" value={formData.commune} onChange={e => setFormData({...formData, commune: e.target.value})}>
-                     {COMUNAS_SANTIAGO.map(c => <option key={c} value={c}>{c}</option>)}
+                     {COMUNAS_CHILE.map(c => ( <option key={c} value={c}>{c}</option>))}
                    </select>
                 </div>
                 <div>
