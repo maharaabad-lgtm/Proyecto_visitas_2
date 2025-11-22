@@ -16,23 +16,17 @@ import {
   TrendingDown,
   History,
   LogOut,
-  Filter,
   Edit,
   Mail,
-  Briefcase,
   DollarSign,
   Eye,
   AlertTriangle,
   Menu,
   X,
   Check,
-  ArrowRight,
-  FileText,
   Lock,
   Phone,
-  BarChart3,
   PieChart as PieChartIcon,
-  LineChart,
   FileBarChart
 } from 'lucide-react';
 
@@ -297,7 +291,6 @@ const Service = {
     // 2. Compromisos
     const pendingActions = visits.filter(v => v.actionStatus !== 'DONE');
     const alerts = pendingActions.map(v => {
-      const dueDate = new Date(v.nextActionDate);
       const diffTime = new Date(v.nextActionDate).setHours(0,0,0,0) - new Date(todayStr).setHours(0,0,0,0);
       const diffDays = Math.ceil(diffTime / (1000 * 3600 * 24));
       
