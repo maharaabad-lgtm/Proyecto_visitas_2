@@ -570,7 +570,7 @@ const LoginScreen = ({ onLogin }: { onLogin: (user: any) => void }) => {
       <div className="bg-white rounded-2xl p-8 w-full max-w-md shadow-2xl">
         <div className="text-center mb-8">
            <h1 className="text-3xl font-bold text-slate-800 tracking-tight">SAUMA <span className="text-amber-600">HERMANOS</span></h1>
-           <p className="text-slate-500 mt-2 text-lg">Gestión Inmobiliaria</p>
+           <p className="text-slate-500 mt-2 text-lg">Inmobiliaria</p>
         </div>
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
@@ -1509,7 +1509,7 @@ const PropertiesPage = () => {
 
       {isModalOpen && (
         <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-50 p-4 backdrop-blur-sm overflow-y-auto">
-          <div className="bg-white rounded-2xl max-w-3xl w-full p-8 shadow-2xl my-10">
+          <div className="bg-white rounded-2xl max-w-3xl w-full p-8 shadow-2xl my-10 max-h-[85vh] overflow-y-auto">
             <h3 className="text-2xl font-bold text-slate-800 mb-6 border-b pb-4">
               {editingProp ? `Editar Propiedad ${editingProp.id}` : 'Nueva Propiedad'}
             </h3>
@@ -1729,7 +1729,11 @@ const VisitsPage = () => {
         <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-50 p-4 backdrop-blur-sm overflow-y-auto">
           <div className="bg-white rounded-2xl max-w-2xl w-full p-8 shadow-2xl my-10">
             <h3 className="text-2xl font-bold text-slate-800 mb-6 border-b pb-4">Registrar Nueva Visita</h3>
-            <form onSubmit={handleAddVisit} className="space-y-6">
+            <form 
+  onSubmit={handleAddVisit} 
+  className="space-y-6 max-h-[70vh] overflow-y-auto pr-3"
+>
+
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                  <div>
@@ -2011,10 +2015,15 @@ const ReportsPage = () => {
       {/* TAB CONTENT */}
       {activeSubTab === 'EXECUTIVES' && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-in slide-in-from-bottom-2">
-           <SimpleBarChart 
-             title="Visitas esta Semana" 
-             data={executivesData.map(d => ({ label: d.name.split(' ')[0], value: d.thisWeek, color: 'bg-blue-500' }))} 
-           />
+           <SimpleBarChart
+title="Visitas esta Semana"
+data={executivesData.map((d) => ({
+// mostramos solo el primer nombre en la etiqueta
+label: d.name.split(' ')[0],
+// usamos las visitas reales de esa persona esta semana
+value: d.thisWeek,
+}))}
+/>
            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
              <h4 className="font-bold text-slate-700 mb-6">Comparativa Mensual</h4>
              <div className="space-y-6">
@@ -2119,9 +2128,40 @@ const ReportsPage = () => {
 };
 
 // 5. MAIN APP
+// Calcula visitas por ejecutivo en la semana actual (lunes a domingo)
+function getWeeklyExecutiveStats() {
+  const visits = Service.getVisits(); // usamos las visitas guardadas en localStorage
+  const now = new Date();
+
+  // calcular lunes de esta semana
+  const day = now.getDay(); // 0 = domingo, 1 = lunes, ...
+  const diffToMonday = (day + 6) % 7;
+
+  const monday = new Date(now);
+  monday.setDate(now.getDate() - diffToMonday);
+  monday.setHours(0, 0, 0, 0);
+
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+  sunday.setHours(23, 59, 59, 999);
+
+  const counters: Record<string, number> = {};
+
+  for (const v of visits) {
+    const date = new Date(v.date);
+    if (date >= monday && date <= sunday) {
+      const exec = (v as any).executive || (v as any).ejecutivo || "Sin Ejecutivo";
+      counters[exec] = (counters[exec] || 0) + 1;
+    }
+  }
+
+  return counters;
+}
+
 const App = () => {
   const [user, setUser] = useState<any>(null);
   const [activeTab, setActiveTab] = useState('dashboard');
+
 
   if (!user) {
     return <LoginScreen onLogin={setUser} />;
