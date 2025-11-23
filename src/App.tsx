@@ -2201,6 +2201,7 @@ value: d.thisWeek,
   );
 };
 
+/*
 // 5. MAIN APP
 // Calcula visitas por ejecutivo en la semana actual (lunes a domingo)
 function getWeeklyExecutiveStats() {
@@ -2231,6 +2232,7 @@ function getWeeklyExecutiveStats() {
 
   return counters;
 }
+*/
 
 const App = () => {
   const [user, setUser] = useState<any>(null);
