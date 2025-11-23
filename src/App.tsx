@@ -1730,102 +1730,176 @@ const VisitsPage = () => {
           <div className="bg-white rounded-2xl max-w-2xl w-full p-8 shadow-2xl my-10">
             <h3 className="text-2xl font-bold text-slate-800 mb-6 border-b pb-4">Registrar Nueva Visita</h3>
             <form 
-  onSubmit={handleAddVisit} 
-  className="space-y-6 max-h-[70vh] overflow-y-auto pr-3"
->
-
-              
+              onSubmit={handleAddVisit} 
+              className="space-y-6 max-h-[70vh] overflow-y-auto pr-3"
+            >
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                 <div>
-                   <label className="block text-sm font-bold text-slate-700 mb-2">Propiedad Visitada</label>
-                   <select required className="w-full p-3 border rounded-xl text-base bg-white" value={formData.propertyId || ''} onChange={e => setFormData({...formData, propertyId: e.target.value})}>
-                     <option value="">Seleccionar...</option>
-                     {properties.filter(p => p.status !== 'LEASED').map(p => (
-                       <option key={p.id} value={p.id}>{p.address} ({formatUF(p.priceUF)})</option>
-                     ))}
-                   </select>
-                 </div>
-                 <div>
-                   <label className="block text-sm font-bold text-slate-700 mb-2">Fecha de Visita</label>
-                   <input 
-                      type="date" 
-                      required 
-                      className="w-full p-3 border rounded-xl text-base" 
-                      value={formData.date}
-                      onChange={e => setFormData({...formData, date: e.target.value})}
-                   />
-                 </div>
-                 <div>
-                   <label className="block text-sm font-bold text-slate-700 mb-2">Ejecutivo Responsable</label>
-                   <select required className="w-full p-3 border rounded-xl text-base bg-white" value={formData.executiveName} onChange={e => setFormData({...formData, executiveName: e.target.value})}>
-                     {USERS.filter(u => u.role !== 'ADMIN').map(u => <option key={u.id} value={u.name}>{u.name}</option>)}
-                   </select>
-                 </div>
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-2">Propiedad Visitada</label>
+                  <select 
+                    required 
+                    className="w-full p-3 border rounded-xl text-base bg-white" 
+                    value={formData.propertyId || ''} 
+                    onChange={e => setFormData({...formData, propertyId: e.target.value})}
+                  >
+                    <option value="">Seleccionar...</option>
+                    {properties.filter(p => p.status !== 'LEASED').map(p => (
+                      <option key={p.id} value={p.id}>
+                        {p.address} ({formatUF(p.priceUF)})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-2">Fecha de Visita</label>
+                  <input 
+                    type="date" 
+                    required 
+                    className="w-full p-3 border rounded-xl text-base" 
+                    value={formData.date}
+                    onChange={e => setFormData({...formData, date: e.target.value})}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-2">Ejecutivo Responsable</label>
+                  <select 
+                    required 
+                    className="w-full p-3 border rounded-xl text-base bg-white" 
+                    value={formData.executiveName} 
+                    onChange={e => setFormData({...formData, executiveName: e.target.value})}
+                  >
+                    {USERS.filter(u => u.role !== 'ADMIN').map(u => (
+                      <option key={u.id} value={u.name}>{u.name}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
               <div className="bg-slate-50 p-6 rounded-xl border border-slate-200">
-                 <h4 className="font-bold text-slate-800 mb-4 flex items-center gap-2"><User className="w-5 h-5"/> Datos del Cliente</h4>
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="md:col-span-2">
-                      <label className="block text-sm font-bold text-slate-700 mb-1">Nombre Completo</label>
-                      <input required className="w-full p-3 border rounded-xl" placeholder="Ej: Juan Pérez" value={formData.clientName || ''} onChange={e => setFormData({...formData, clientName: e.target.value})} />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-bold text-slate-700 mb-1">Teléfono</label>
-                      <input className="w-full p-3 border rounded-xl" type="tel" placeholder="+569..." value={formData.clientPhone || ''} onChange={e => setFormData({...formData, clientPhone: e.target.value})} />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-bold text-slate-700 mb-1">Email</label>
-                      <input className="w-full p-3 border rounded-xl" type="email" placeholder="cliente@email.com" value={formData.clientEmail || ''} onChange={e => setFormData({...formData, clientEmail: e.target.value})} />
-                    </div>
-                 </div>
-                 
-                 <div className="mt-4 pt-4 border-t border-slate-200">
-                    <label className="flex items-center gap-2 cursor-pointer mb-2">
-                      <input type="checkbox" className="w-5 h-5 rounded text-amber-600" checked={formData.hasBroker} onChange={e => setFormData({...formData, hasBroker: e.target.checked})} />
-                      <span className="text-sm font-bold text-slate-700">¿Asiste con Corredor?</span>
-                    </label>
-                    {formData.hasBroker && (
-                      <input 
-                        className="w-full p-3 border rounded-xl mt-2 animate-in fade-in" 
-                        placeholder="Nombre del Corredor / Empresa"
-                        value={formData.brokerName || ''}
-                        onChange={e => setFormData({...formData, brokerName: e.target.value})}
-                      />
-                    )}
-                 </div>
+                <h4 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
+                  <User className="w-5 h-5"/> Datos del Cliente
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-bold text-slate-700 mb-1">Nombre Completo</label>
+                    <input 
+                      required 
+                      className="w-full p-3 border rounded-xl" 
+                      placeholder="Ej: Juan Pérez" 
+                      value={formData.clientName || ''} 
+                      onChange={e => setFormData({...formData, clientName: e.target.value})} 
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-1">Teléfono</label>
+                    <input 
+                      className="w-full p-3 border rounded-xl" 
+                      type="tel" 
+                      placeholder="+569..." 
+                      value={formData.clientPhone || ''} 
+                      onChange={e => setFormData({...formData, clientPhone: e.target.value})} 
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-1">Email</label>
+                    <input 
+                      className="w-full p-3 border rounded-xl" 
+                      type="email" 
+                      placeholder="cliente@email.com" 
+                      value={formData.clientEmail || ''} 
+                      onChange={e => setFormData({...formData, clientEmail: e.target.value})} 
+                    />
+                  </div>
+                </div>
+                
+                <div className="mt-4 pt-4 border-t border-slate-200">
+                  <label className="flex items-center gap-2 cursor-pointer mb-2">
+                    <input 
+                      type="checkbox" 
+                      className="w-5 h-5 rounded text-amber-600" 
+                      checked={formData.hasBroker} 
+                      onChange={e => setFormData({...formData, hasBroker: e.target.checked})} 
+                    />
+                    <span className="text-sm font-bold text-slate-700">¿Asiste con Corredor?</span>
+                  </label>
+                  {formData.hasBroker && (
+                    <input 
+                      className="w-full p-3 border rounded-xl mt-2 animate-in fade-in" 
+                      placeholder="Nombre del Corredor / Empresa"
+                      value={formData.brokerName || ''}
+                      onChange={e => setFormData({...formData, brokerName: e.target.value})}
+                    />
+                  )}
+                </div>
               </div>
 
               <div>
                 <label className="block text-sm font-bold text-slate-700 mb-2">Resultado / Comentarios</label>
-                <textarea required className="w-full p-3 border rounded-xl h-24" placeholder="Resumen de la visita, interés del cliente, etc." value={formData.comments || ''} onChange={e => setFormData({...formData, comments: e.target.value})} />
+                <textarea 
+                  required 
+                  className="w-full p-3 border rounded-xl h-24" 
+                  placeholder="Resumen de la visita, interés del cliente, etc." 
+                  value={formData.comments || ''} 
+                  onChange={e => setFormData({...formData, comments: e.target.value})} 
+                />
               </div>
 
               <div>
                 <label className="block text-sm font-bold text-slate-700 mb-2">Oferta (Opcional)</label>
                 <div className="relative">
-                   <DollarSign className="w-5 h-5 absolute left-3 top-3 text-slate-400"/>
-                   <input type="number" className="w-full pl-10 p-3 border rounded-xl" placeholder="Monto en UF" value={formData.offerUF || ''} onChange={e => setFormData({...formData, offerUF: Number(e.target.value)})} />
+                  <DollarSign className="w-5 h-5 absolute left-3 top-3 text-slate-400"/>
+                  <input 
+                    type="number" 
+                    className="w-full pl-10 p-3 border rounded-xl" 
+                    placeholder="Monto en UF" 
+                    value={formData.offerUF || ''} 
+                    onChange={e => setFormData({...formData, offerUF: Number(e.target.value)})} 
+                  />
                 </div>
               </div>
 
               <div className="bg-blue-50 p-6 rounded-xl border border-blue-100">
-                 <h4 className="font-bold text-blue-800 mb-4 flex items-center gap-2"><ClipboardList className="w-5 h-5"/> Compromiso / Siguiente Paso</h4>
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="md:col-span-2">
-                      <label className="block text-sm font-bold text-slate-700 mb-1">Acción a Realizar</label>
-                      <input required className="w-full p-3 border rounded-xl" placeholder="Ej: Enviar planos, Llamar para respuesta..." value={formData.nextAction || ''} onChange={e => setFormData({...formData, nextAction: e.target.value})} />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-bold text-slate-700 mb-1">Fecha Límite</label>
-                      <input type="date" required className="w-full p-3 border rounded-xl" value={formData.nextActionDate || ''} onChange={e => setFormData({...formData, nextActionDate: e.target.value})} />
-                    </div>
-                 </div>
+                <h4 className="font-bold text-blue-800 mb-4 flex items-center gap-2">
+                  <ClipboardList className="w-5 h-5"/> Compromiso / Siguiente Paso
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-bold text-slate-700 mb-1">Acción a Realizar</label>
+                    <input 
+                      required 
+                      className="w-full p-3 border rounded-xl" 
+                      placeholder="Ej: Enviar planos, Llamar para respuesta..." 
+                      value={formData.nextAction || ''} 
+                      onChange={e => setFormData({...formData, nextAction: e.target.value})} 
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-1">Fecha Límite</label>
+                    <input 
+                      type="date" 
+                      required 
+                      className="w-full p-3 border rounded-xl" 
+                      value={formData.nextActionDate || ''} 
+                      onChange={e => setFormData({...formData, nextActionDate: e.target.value})} 
+                    />
+                  </div>
+                </div>
               </div>
 
               <div className="flex gap-4 pt-4">
-                 <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 py-3 text-slate-500 font-bold hover:bg-slate-100 rounded-xl">Cancelar</button>
-                 <button type="submit" className="flex-1 py-3 bg-amber-600 text-white font-bold rounded-xl hover:bg-amber-700 shadow-lg">Registrar Visita</button>
+                <button 
+                  type="button" 
+                  onClick={() => setIsModalOpen(false)} 
+                  className="flex-1 py-3 text-slate-500 font-bold hover:bg-slate-100 rounded-xl"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  type="submit" 
+                  className="flex-1 py-3 bg-amber-600 text-white font-bold rounded-xl hover:bg-amber-700 shadow-lg"
+                >
+                  Registrar Visita
+                </button>
               </div>
             </form>
           </div>
