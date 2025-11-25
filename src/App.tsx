@@ -26,7 +26,8 @@ import {
   Lock,
   Phone,
   PieChart as PieChartIcon,
-  FileBarChart
+  FileBarChart,
+  Trash2
 } from 'lucide-react';
 
 // --- CONSTANTS & LISTS ---
@@ -282,6 +283,13 @@ const Service = {
     localStorage.setItem(STORAGE_KEYS.PROPERTIES, JSON.stringify(properties));
   },
 
+  deleteProperty: (propertyId: string) => {
+  const properties = Service.getProperties();
+  const updated = properties.filter(p => p.id !== propertyId);
+  localStorage.setItem(STORAGE_KEYS.PROPERTIES, JSON.stringify(updated));
+},
+
+
   getVisits: (): Visit[] => {
     const stored = localStorage.getItem(STORAGE_KEYS.VISITS);
     return stored ? JSON.parse(stored) : [];
@@ -362,6 +370,22 @@ const Service = {
     }
   },
 
+  deleteProperty: (propertyId: string) => {
+    // 1. Filtrar propiedades
+    const properties = Service
+      .getProperties()
+      .filter(p => p.id !== propertyId);
+    localStorage.setItem(STORAGE_KEYS.PROPERTIES, JSON.stringify(properties));
+
+    // 2. Filtrar visitas asociadas a esa propiedad
+    const visits = Service
+      .getVisits()
+      .filter(v => v.propertyId !== propertyId);
+    localStorage.setItem(STORAGE_KEYS.VISITS, JSON.stringify(visits));
+
+    // devolvemos los nuevos arrays para actualizar el estado en React
+    return { properties, visits };
+  },
   getAlerts: () => {
     const properties = Service.getProperties();
     const visits = Service.getVisits();
@@ -1260,7 +1284,7 @@ const Dashboard = ({ setActiveTab }: { setActiveTab: (tab: string) => void }) =>
 };
 
 // 2. PROPERTIES PAGE
-const PropertiesPage = () => {
+const PropertiesPage = ({ user }: { user: any }) => {
   const [properties, setProperties] = useState<Property[]>(Service.getProperties());
   const [visits, setVisits] = useState<Visit[]>(Service.getVisits());
   const [filterStatus, setFilterStatus] = useState<string>('ALL');
@@ -1301,9 +1325,28 @@ const PropertiesPage = () => {
     setIsModalOpen(true);
   };
 
+
+  // 🔴 NUEVO: función para eliminar propiedades (solo usada por ADMIN)
+  const handleDeleteProperty = (prop: Property) => {
+    const ok = window.confirm(
+      `¿Eliminar ${prop.address}? Esta acción no se puede deshacer.`
+    );
+    if (!ok) return;
+
+    // Bloquear eliminar propiedades arrendadas
+    if (prop.status === 'LEASED') {
+      alert('No puedes eliminar una propiedad que está arrendada.');
+      return;
+    }
+
+    Service.deleteProperty(prop.id);
+    setProperties(Service.getProperties());
+    setVisits(Service.getVisits()); // opcional, por si quieres refrescar también visitas
+  };
+
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // Validation for status dates
     if (formData.status === 'AVAILABLE' && !formData.vacancyStartDate) {
       alert("Debe ingresar la fecha desde cuándo está disponible (Inicio Vacancia).");
@@ -1313,26 +1356,35 @@ const PropertiesPage = () => {
       alert("Debe ingresar la fecha de término del contrato actual (Entrega).");
       return;
     }
-    if (formData.status === 'LEASED' && (!formData.leaseStartDate || !formData.leaseEndDate || !formData.currentTenant)) {
+    if (
+      formData.status === 'LEASED' &&
+      (!formData.leaseStartDate || !formData.leaseEndDate || !formData.currentTenant)
+    ) {
       alert("Debe ingresar los datos del contrato (Cliente, Fechas).");
       return;
     }
 
-    const propId = editingProp ? editingProp.id : `P-${Math.floor(Math.random() * 90000) + 10000}`;
+    const propId = editingProp
+      ? editingProp.id
+      : `P-${Math.floor(Math.random() * 90000) + 10000}`;
 
-    const isTransitionToLeased = formData.status === 'LEASED' && editingProp?.status !== 'LEASED';
-    
+    const isTransitionToLeased =
+      formData.status === 'LEASED' && editingProp?.status !== 'LEASED';
+
     if (isTransitionToLeased) {
-      const pendingVisits = visits.filter(v => v.propertyId === propId && v.actionStatus === 'PENDING');
+      const pendingVisits = visits.filter(
+        (v) => v.propertyId === propId && v.actionStatus === 'PENDING'
+      );
       if (pendingVisits.length > 0) {
-         setPendingLeaseData({ propId, winner: formData.currentTenant || '' });
-         setShowLeaseResolution(true);
-         return; 
+        setPendingLeaseData({ propId, winner: formData.currentTenant || '' });
+        setShowLeaseResolution(true);
+        return;
       }
     }
 
     finalizeSave(propId);
   };
+
 
   const finalizeSave = (propId: string) => {
     const newProp: Property = {
@@ -1432,11 +1484,7 @@ const PropertiesPage = () => {
           return (
           <div key={p.id} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all flex flex-col md:flex-row justify-between gap-6 relative group">
             
-            <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
-               <button onClick={() => openEdit(p)} className="text-slate-400 hover:text-amber-600 p-2">
-                 <Edit className="w-5 h-5" />
-               </button>
-            </div>
+           
 
             <div className="space-y-3 flex-1">
               <div className="flex items-center gap-3 flex-wrap">
@@ -1444,7 +1492,30 @@ const PropertiesPage = () => {
                 <StatusBadge status={p.status} />
                 <span className="text-sm text-slate-500 font-medium">{p.type}</span>
               </div>
-              
+              <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
+
+  {/* Editar: lo pueden ver todos */}
+  <button
+    onClick={() => openEdit(p)}
+    className="text-slate-400 hover:text-amber-600 p-2 rounded-full bg-white/80 shadow-sm"
+    title="Editar propiedad"
+  >
+    <Edit className="w-5 h-5" />
+  </button>
+
+  {/* Eliminar: SOLO para ADMIN */}
+  {user?.role === 'ADMIN' && (
+    <button
+      onClick={() => handleDeleteProperty(p)}
+      className="text-slate-400 hover:text-red-600 p-2 rounded-full bg-white/80 shadow-sm"
+      title="Eliminar propiedad"
+    >
+      <Trash2 className="w-5 h-5" />
+    </button>
+  )}
+
+</div>
+
               <h3 className="text-xl font-bold text-slate-800">{p.address}, {p.commune}</h3>
               
               <div className="flex gap-6 text-sm text-slate-600">
@@ -2563,7 +2634,7 @@ const App = () => {
 
         <div className="p-6 md:p-10 max-w-7xl mx-auto pb-20">
           {activeTab === 'dashboard' && <Dashboard setActiveTab={setActiveTab} />}
-          {activeTab === 'properties' && <PropertiesPage />}
+          {activeTab === 'properties' && <PropertiesPage user={user} />}
           {activeTab === 'visits' && <VisitsPage />}
           {activeTab === 'reports' && <ReportsPage />}
           {activeTab === 'alerts' && <Dashboard setActiveTab={setActiveTab} />} {/* Redirect to dashboard for now */}
