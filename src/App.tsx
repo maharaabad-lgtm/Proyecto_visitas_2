@@ -283,11 +283,6 @@ const Service = {
     localStorage.setItem(STORAGE_KEYS.PROPERTIES, JSON.stringify(properties));
   },
 
-  deleteProperty: (propertyId: string) => {
-  const properties = Service.getProperties();
-  const updated = properties.filter(p => p.id !== propertyId);
-  localStorage.setItem(STORAGE_KEYS.PROPERTIES, JSON.stringify(updated));
-},
 
 
   getVisits: (): Visit[] => {
