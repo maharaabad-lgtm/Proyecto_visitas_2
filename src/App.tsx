@@ -18,7 +18,6 @@ import {
   LogOut,
   Edit,
   Mail,
-  DollarSign,
   Eye,
   AlertTriangle,
   Menu,
