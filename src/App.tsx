@@ -2054,27 +2054,29 @@ const VisitsPage = () => {
                 />
               </div>
 
-              {/* Oferta */}
-              <div>
-                <label className="block text-sm font-bold text-slate-700 mb-2">
-                  Oferta (Opcional)
-                </label>
-                <div className="relative">
-                  <DollarSign className="w-5 h-5 absolute left-3 top-3 text-slate-400" />
-                  <input
-                    type="number"
-                    className="w-full pl-10 p-3 border rounded-xl"
-                    placeholder="Monto en UF"
-                    value={formData.offerUF || ''}
-                    onChange={e =>
-                      setFormData({
-                        ...formData,
-                        offerUF: Number(e.target.value),
-                      })
-                    }
-                  />
-                </div>
-              </div>
+{/* Canon UF (Obligatorio) */}
+<div>
+  <label className="block text-sm font-bold text-slate-700 mb-2">
+    Canon (UF)
+  </label>
+
+  <div>
+    <input
+      type="number"
+      required
+      className="w-full p-3 border rounded-xl"
+      placeholder="Canon mensual en UF"
+      value={formData.offerUF || ''}
+      onChange={(e) =>
+        setFormData({
+          ...formData,
+          offerUF: Number(e.target.value),
+        })
+      }
+    />
+  </div>
+</div>
+
 
               {/* Compromiso */}
               <div className="bg-blue-50 p-6 rounded-xl border border-blue-100">
