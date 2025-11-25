@@ -2257,45 +2257,58 @@ const ReportsPage = () => {
 
   // --- TAB 3: Stale Properties Logic ---
   const staleData = useMemo(() => {
-    // Generate last 4 weeks points
-    const points = [];
+    const alerts = Service.getAlerts();
+    const currentFromAlerts = alerts.staleProperties.length; // MISMO NÚMERO QUE EN ALERTAS STOCK
+
+    // Generate last 4–5 weeks points (histórico aproximado)
+    const points: { label: string; value: number }[] = [];
     const now = new Date();
     
-    // Calculate stale count for a specific date in the past
+    // Calcula cuántas habrían estado críticas en una fecha pasada
     const getStaleCountForDate = (date: Date) => {
        return properties.filter(p => {
           if (p.status === 'LEASED') return false;
-          // Visits strictly before 'date'
-          const visitsUntilDate = visits.filter(v => v.propertyId === p.id && new Date(v.date) <= date);
+          const visitsUntilDate = visits.filter(
+            v => v.propertyId === p.id && new Date(v.date) <= date
+          );
           
           if (visitsUntilDate.length === 0) {
              const created = new Date(p.createdAt);
              return (date.getTime() - created.getTime()) / (1000 * 3600 * 24) > 30;
           }
 
-          const lastVisit = visitsUntilDate.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
+          const lastVisit = visitsUntilDate.sort(
+            (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+          )[0];
           const lastVisitDate = new Date(lastVisit.date);
           return (date.getTime() - lastVisitDate.getTime()) / (1000 * 3600 * 24) > 30;
        }).length;
     };
 
-    // Last 5 weeks
+    // Últimas 5 semanas
     for (let i = 4; i >= 0; i--) {
        const d = new Date(now);
-       d.setDate(d.getDate() - (i * 7));
+       d.setDate(d.getDate() - i * 7);
        const label = i === 0 ? 'Hoy' : `Hace ${i} sem`;
        points.push({ label, value: getStaleCountForDate(d) });
     }
 
-    // "Exited List" metric: Count properties that were stale 30 days ago but are NOT stale today (meaning they got visited or leased)
-    const thirtyDaysAgo = new Date(now); thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    const staleThen = getStaleCountForDate(thirtyDaysAgo);
-    const staleNow = points[points.length-1].value;
-    // This is a rough approximation for the demo
-    const recovered = Math.max(0, staleThen - staleNow + 2); // +2 just to simulate new ones entered so the delta isn't just net loss
+    // Aseguramos que el punto "Hoy" coincida 100% con Alertas Stock
+    if (points.length > 0) {
+      points[points.length - 1].value = currentFromAlerts;
+    }
 
-    return { points, recovered, current: staleNow };
+    // Métrica de "recuperadas"
+    const thirtyDaysAgo = new Date(now);
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    const staleThen = getStaleCountForDate(thirtyDaysAgo);
+    const staleNow = currentFromAlerts;
+    const recovered = Math.max(0, staleThen - staleNow + 2); // sigue siendo aproximado
+
+    return { points, recovered, current: currentFromAlerts };
   }, [properties, visits]);
+
 
   return (
     <div className="space-y-6 animate-in fade-in">
