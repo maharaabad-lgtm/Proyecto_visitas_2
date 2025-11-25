@@ -1618,17 +1618,29 @@ const PropertiesPage = () => {
 const VisitsPage = () => {
   const [visits, setVisits] = useState<Visit[]>(Service.getVisits());
   const [properties] = useState<Property[]>(Service.getProperties());
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [viewVisit, setViewVisit] = useState<Visit | null>(null);
   const [viewHistoryClient, setViewHistoryClient] = useState<string | null>(null);
   const [selectedVisitForAction, setSelectedVisitForAction] = useState<Visit | null>(null);
 
+  // Filtros de búsqueda
+  const [searchText, setSearchText] = useState('');
+  const [filterExec, setFilterExec] = useState<'ALL' | string>('ALL');
+  const [filterBroker, setFilterBroker] = useState<'ALL' | 'WITH' | 'WITHOUT'>('ALL');
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
+
+  const executives = Array.from(
+    new Set(USERS.filter(u => u.role !== 'ADMIN').map(u => u.name))
+  );
+
   // New Visit Form State
   const initialForm: Partial<Visit> = {
     date: new Date().toISOString().split('T')[0],
-    executiveName: 'Juan Pérez', // Default
+    executiveName: executives[0] || 'Juan Pérez',
     hasBroker: false,
-    actionStatus: 'PENDING'
+    actionStatus: 'PENDING',
   };
   const [formData, setFormData] = useState<Partial<Visit>>(initialForm);
 
@@ -1638,28 +1650,63 @@ const VisitsPage = () => {
 
   const handleAddVisit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.propertyId) { alert("Seleccione una propiedad"); return; }
-    
+    if (!formData.propertyId) {
+      alert('Seleccione una propiedad');
+      return;
+    }
+
     const newVisit: Visit = {
-       ...formData as Visit,
-       id: `V-${Math.floor(Math.random() * 90000) + 10000}`,
-       createdAt: new Date().toISOString()
+      ...formData as Visit,
+      id: `V-${Math.floor(Math.random() * 90000) + 10000}`,
+      createdAt: new Date().toISOString(),
     };
-    
+
     Service.addVisit(newVisit);
     refreshVisits();
     setIsModalOpen(false);
     setFormData(initialForm);
   };
 
-  // Group visits by date descending
-  const sortedVisits = [...visits].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  // FILTRO + ORDEN de visitas
+  const filteredVisits = useMemo(() => {
+    return visits.filter(v => {
+      const prop = properties.find(p => p.id === v.propertyId);
+
+      const matchesSearch =
+        searchText.trim() === '' ||
+        v.clientName.toLowerCase().includes(searchText.toLowerCase()) ||
+        v.id.toLowerCase().includes(searchText.toLowerCase()) ||
+        v.propertyId.toLowerCase().includes(searchText.toLowerCase()) ||
+        (prop?.address || '').toLowerCase().includes(searchText.toLowerCase());
+
+      const matchesExec = filterExec === 'ALL' || v.executiveName === filterExec;
+
+      const matchesBroker =
+        filterBroker === 'ALL' ||
+        (filterBroker === 'WITH' && v.hasBroker) ||
+        (filterBroker === 'WITHOUT' && !v.hasBroker);
+
+      const visitTime = new Date(v.date).getTime();
+      const matchesFrom = fromDate === '' || visitTime >= new Date(fromDate).getTime();
+      const matchesTo = toDate === '' || visitTime <= new Date(toDate).getTime();
+
+      return matchesSearch && matchesExec && matchesBroker && matchesFrom && matchesTo;
+    });
+  }, [visits, properties, searchText, filterExec, filterBroker, fromDate, toDate]);
+
+  const sortedVisits = useMemo(
+    () =>
+      [...filteredVisits].sort(
+        (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+      ),
+    [filteredVisits]
+  );
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col md:flex-row justify-between md:items-center gap-4">
         <h2 className="text-2xl font-bold text-slate-800">Bitácora de Visitas</h2>
-        <button 
+        <button
           onClick={() => setIsModalOpen(true)}
           className="bg-amber-600 hover:bg-amber-700 text-white px-6 py-3 rounded-xl flex items-center gap-2 text-base font-bold shadow-md transition-colors"
         >
@@ -1667,235 +1714,422 @@ const VisitsPage = () => {
         </button>
       </div>
 
-      {/* List */}
-      <div className="grid grid-cols-1 gap-4">
-        {sortedVisits.map(v => {
-           const prop = properties.find(p => p.id === v.propertyId);
-           return (
-             <div key={v.id} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all flex flex-col md:flex-row gap-6">
-                <div className="flex-1 space-y-2">
-                   <div className="flex items-center gap-3">
-                     <span className="font-bold text-amber-600 bg-amber-50 px-2 py-1 rounded text-xs">{v.date}</span>
-                     <span className="text-xs font-bold text-slate-400 uppercase">{v.id}</span>
-                   </div>
-                   <h3 className="text-lg font-bold text-slate-800">{prop?.address || v.propertyId}</h3>
-                   <div className="text-sm text-slate-600 space-y-1">
-                     <p className="flex items-center gap-2">
-                       <User className="w-4 h-4 text-slate-400"/> 
-                       <button onClick={() => setViewHistoryClient(v.clientName)} className="hover:text-amber-600 hover:underline font-medium">
-                         {v.clientName}
-                       </button>
-                     </p>
-                     <p className="pl-6 text-xs text-slate-500">Ejecutivo: {v.executiveName}</p>
-                   </div>
-                   
-                   <div className="mt-3 bg-slate-50 p-3 rounded-lg border border-slate-100 text-sm italic text-slate-600">
-                      "{v.comments}"
-                   </div>
-                </div>
+      {/* Filtros de búsqueda */}
+      <div className="bg-white p-4 md:p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+        <div className="flex flex-col lg:flex-row gap-4">
+          {/* Búsqueda libre */}
+          <div className="relative flex-1 min-w-[220px]">
+            <Search className="w-5 h-5 absolute left-3 top-3 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Buscar por cliente, dirección, ID visita o ID propiedad..."
+              className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 text-sm"
+              value={searchText}
+              onChange={e => setSearchText(e.target.value)}
+            />
+          </div>
 
-                <div className="md:w-72 border-t md:border-t-0 md:border-l border-slate-100 pt-4 md:pt-0 md:pl-6 flex flex-col justify-center">
-                   <div className="mb-3">
-                      <label className="text-xs font-bold text-slate-400 uppercase block mb-1">Compromiso Actual</label>
-                      <div className="flex justify-between items-start gap-2">
-                        <p className="text-sm font-bold text-slate-800 leading-tight">{v.nextAction}</p>
-                        <StatusBadge status={v.actionStatus} />
-                      </div>
-                      <p className="text-xs text-slate-500 mt-1">Fecha: {v.nextActionDate}</p>
-                   </div>
-                   
-                   <div className="flex gap-2 mt-auto">
-                      <button 
-                        onClick={() => setViewVisit(v)}
-                        className="flex-1 py-2 px-3 bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-bold rounded-lg flex items-center justify-center gap-1"
-                      >
-                        <Eye className="w-3 h-3"/> Ver Detalle
-                      </button>
-                      <button 
-                        onClick={() => setSelectedVisitForAction(v)}
-                        className="flex-1 py-2 px-3 bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-bold rounded-lg flex items-center justify-center gap-1"
-                      >
-                        <Edit className="w-3 h-3"/> Gestionar
-                      </button>
-                   </div>
-                </div>
-             </div>
-           );
-        })}
+          {/* Ejecutivo */}
+          <select
+            className="px-4 py-2.5 border border-slate-300 rounded-xl bg-white text-sm font-medium focus:outline-none focus:border-amber-500 min-w-[180px]"
+            value={filterExec}
+            onChange={e => setFilterExec(e.target.value)}
+          >
+            <option value="ALL">Todos los ejecutivos</option>
+            {executives.map(name => (
+              <option key={name} value={name}>
+                {name}
+              </option>
+            ))}
+          </select>
+
+          {/* Con / sin corredor */}
+          <select
+            className="px-4 py-2.5 border border-slate-300 rounded-xl bg-white text-sm font-medium focus:outline-none focus:border-amber-500 min-w-[180px]"
+            value={filterBroker}
+            onChange={e =>
+              setFilterBroker(e.target.value as 'ALL' | 'WITH' | 'WITHOUT')
+            }
+          >
+            <option value="ALL">Con y sin corredor</option>
+            <option value="WITH">Sólo con corredor</option>
+            <option value="WITHOUT">Sólo sin corredor</option>
+          </select>
+        </div>
+
+        {/* Rango de fechas */}
+        <div className="flex flex-col sm:flex-row gap-4">
+          <div className="flex-1">
+            <label className="block text-xs font-bold text-slate-500 mb-1">
+              Desde fecha
+            </label>
+            <input
+              type="date"
+              className="w-full px-3 py-2.5 border border-slate-300 rounded-xl text-sm"
+              value={fromDate}
+              onChange={e => setFromDate(e.target.value)}
+            />
+          </div>
+          <div className="flex-1">
+            <label className="block text-xs font-bold text-slate-500 mb-1">
+              Hasta fecha
+            </label>
+            <input
+              type="date"
+              className="w-full px-3 py-2.5 border border-slate-300 rounded-xl text-sm"
+              value={toDate}
+              onChange={e => setToDate(e.target.value)}
+            />
+          </div>
+        </div>
       </div>
 
-      {/* New Visit Modal */}
+      {/* Lista de visitas */}
+      <div className="grid grid-cols-1 gap-4">
+        {sortedVisits.map(v => {
+          const prop = properties.find(p => p.id === v.propertyId);
+          return (
+            <div
+              key={v.id}
+              className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all flex flex-col md:flex-row gap-6"
+            >
+              <div className="flex-1 space-y-2">
+                <div className="flex items-center gap-3">
+                  <span className="font-bold text-amber-600 bg-amber-50 px-2 py-1 rounded text-xs">
+                    {v.date}
+                  </span>
+                  <span className="text-xs font-bold text-slate-400 uppercase">
+                    {v.id}
+                  </span>
+                </div>
+                <h3 className="text-lg font-bold text-slate-800">
+                  {prop?.address || v.propertyId}
+                </h3>
+                <div className="text-sm text-slate-600 space-y-1">
+                  <p className="flex items-center gap-2">
+                    <User className="w-4 h-4 text-slate-400" />
+                    <button
+                      onClick={() => setViewHistoryClient(v.clientName)}
+                      className="hover:text-amber-600 hover:underline font-medium"
+                    >
+                      {v.clientName}
+                    </button>
+                  </p>
+                  <p className="pl-6 text-xs text-slate-500">
+                    Ejecutivo: {v.executiveName}
+                  </p>
+                  {v.hasBroker && (
+                    <p className="pl-6 text-xs text-amber-600">
+                      Corredor: {v.brokerName}
+                    </p>
+                  )}
+                </div>
+
+                <div className="mt-3 bg-slate-50 p-3 rounded-lg border border-slate-100 text-sm italic text-slate-600">
+                  "{v.comments}"
+                </div>
+              </div>
+
+              <div className="md:w-72 border-t md:border-t-0 md:border-l border-slate-100 pt-4 md:pt-0 md:pl-6 flex flex-col justify-center">
+                <div className="mb-3">
+                  <label className="text-xs font-bold text-slate-400 uppercase block mb-1">
+                    Compromiso Actual
+                  </label>
+                  <div className="flex justify-between items-start gap-2">
+                    <p className="text-sm font-bold text-slate-800 leading-tight">
+                      {v.nextAction}
+                    </p>
+                    <StatusBadge status={v.actionStatus} />
+                  </div>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Fecha: {v.nextActionDate}
+                  </p>
+                </div>
+
+                <div className="flex gap-2 mt-auto">
+                  <button
+                    onClick={() => setViewVisit(v)}
+                    className="flex-1 py-2 px-3 bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-bold rounded-lg flex items-center justify-center gap-1"
+                  >
+                    <Eye className="w-3 h-3" /> Ver Detalle
+                  </button>
+                  <button
+                    onClick={() => setSelectedVisitForAction(v)}
+                    className="flex-1 py-2 px-3 bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-bold rounded-lg flex items-center justify-center gap-1"
+                  >
+                    <Edit className="w-3 h-3" /> Gestionar
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+
+        {sortedVisits.length === 0 && (
+          <p className="text-center text-slate-400 py-10">
+            No hay visitas que coincidan con los filtros.
+          </p>
+        )}
+      </div>
+
+      {/* MODAL: Nueva visita */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-50 p-4 backdrop-blur-sm overflow-y-auto">
-          <div className="bg-white rounded-2xl max-w-2xl w-full p-8 shadow-2xl my-10">
-            <h3 className="text-2xl font-bold text-slate-800 mb-6 border-b pb-4">Registrar Nueva Visita</h3>
-            <form 
-              onSubmit={handleAddVisit} 
-              className="space-y-6 max-h-[70vh] overflow-y-auto pr-3"
-            >
+          <div className="bg-white rounded-2xl max-w-2xl w-full p-8 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <h3 className="text-2xl font-bold text-slate-800 mb-6 border-b pb-4">
+              Registrar Nueva Visita
+            </h3>
+
+            <form onSubmit={handleAddVisit} className="space-y-6">
+              {/* Datos básicos */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-2">Propiedad Visitada</label>
-                  <select 
-                    required 
-                    className="w-full p-3 border rounded-xl text-base bg-white" 
-                    value={formData.propertyId || ''} 
-                    onChange={e => setFormData({...formData, propertyId: e.target.value})}
+                  <label className="block text-sm font-bold text-slate-700 mb-2">
+                    Propiedad Visitada
+                  </label>
+                  <select
+                    required
+                    className="w-full p-3 border rounded-xl text-base bg-white"
+                    value={formData.propertyId || ''}
+                    onChange={e =>
+                      setFormData({ ...formData, propertyId: e.target.value })
+                    }
                   >
                     <option value="">Seleccionar...</option>
-                    {properties.filter(p => p.status !== 'LEASED').map(p => (
-                      <option key={p.id} value={p.id}>
-                        {p.address} ({formatUF(p.priceUF)})
-                      </option>
-                    ))}
+                    {properties
+                      .filter(p => p.status !== 'LEASED')
+                      .map(p => (
+                        <option key={p.id} value={p.id}>
+                          {p.address} ({formatUF(p.priceUF)})
+                        </option>
+                      ))}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-2">Fecha de Visita</label>
-                  <input 
-                    type="date" 
-                    required 
-                    className="w-full p-3 border rounded-xl text-base" 
+                  <label className="block text-sm font-bold text-slate-700 mb-2">
+                    Fecha de Visita
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    className="w-full p-3 border rounded-xl text-base"
                     value={formData.date}
-                    onChange={e => setFormData({...formData, date: e.target.value})}
+                    onChange={e =>
+                      setFormData({ ...formData, date: e.target.value })
+                    }
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-2">Ejecutivo Responsable</label>
-                  <select 
-                    required 
-                    className="w-full p-3 border rounded-xl text-base bg-white" 
-                    value={formData.executiveName} 
-                    onChange={e => setFormData({...formData, executiveName: e.target.value})}
+                  <label className="block text-sm font-bold text-slate-700 mb-2">
+                    Ejecutivo Responsable
+                  </label>
+                  <select
+                    required
+                    className="w-full p-3 border rounded-xl text-base bg-white"
+                    value={formData.executiveName}
+                    onChange={e =>
+                      setFormData({
+                        ...formData,
+                        executiveName: e.target.value,
+                      })
+                    }
                   >
-                    {USERS.filter(u => u.role !== 'ADMIN').map(u => (
-                      <option key={u.id} value={u.name}>{u.name}</option>
+                    {executives.map(name => (
+                      <option key={name} value={name}>
+                        {name}
+                      </option>
                     ))}
                   </select>
                 </div>
               </div>
 
+              {/* Cliente */}
               <div className="bg-slate-50 p-6 rounded-xl border border-slate-200">
                 <h4 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
-                  <User className="w-5 h-5"/> Datos del Cliente
+                  <User className="w-5 h-5" /> Datos del Cliente
                 </h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="md:col-span-2">
-                    <label className="block text-sm font-bold text-slate-700 mb-1">Nombre Completo</label>
-                    <input 
-                      required 
-                      className="w-full p-3 border rounded-xl" 
-                      placeholder="Ej: Juan Pérez" 
-                      value={formData.clientName || ''} 
-                      onChange={e => setFormData({...formData, clientName: e.target.value})} 
+                    <label className="block text-sm font-bold text-slate-700 mb-1">
+                      Nombre Completo
+                    </label>
+                    <input
+                      required
+                      className="w-full p-3 border rounded-xl"
+                      placeholder="Ej: Juan Pérez"
+                      value={formData.clientName || ''}
+                      onChange={e =>
+                        setFormData({
+                          ...formData,
+                          clientName: e.target.value,
+                        })
+                      }
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-1">Teléfono</label>
-                    <input 
-                      className="w-full p-3 border rounded-xl" 
-                      type="tel" 
-                      placeholder="+569..." 
-                      value={formData.clientPhone || ''} 
-                      onChange={e => setFormData({...formData, clientPhone: e.target.value})} 
+                    <label className="block text-sm font-bold text-slate-700 mb-1">
+                      Teléfono
+                    </label>
+                    <input
+                      className="w-full p-3 border rounded-xl"
+                      type="tel"
+                      placeholder="+569..."
+                      value={formData.clientPhone || ''}
+                      onChange={e =>
+                        setFormData({
+                          ...formData,
+                          clientPhone: e.target.value,
+                        })
+                      }
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-1">Email</label>
-                    <input 
-                      className="w-full p-3 border rounded-xl" 
-                      type="email" 
-                      placeholder="cliente@email.com" 
-                      value={formData.clientEmail || ''} 
-                      onChange={e => setFormData({...formData, clientEmail: e.target.value})} 
+                    <label className="block text-sm font-bold text-slate-700 mb-1">
+                      Email
+                    </label>
+                    <input
+                      className="w-full p-3 border rounded-xl"
+                      type="email"
+                      placeholder="cliente@email.com"
+                      value={formData.clientEmail || ''}
+                      onChange={e =>
+                        setFormData({
+                          ...formData,
+                          clientEmail: e.target.value,
+                        })
+                      }
                     />
                   </div>
                 </div>
-                
+
                 <div className="mt-4 pt-4 border-t border-slate-200">
                   <label className="flex items-center gap-2 cursor-pointer mb-2">
-                    <input 
-                      type="checkbox" 
-                      className="w-5 h-5 rounded text-amber-600" 
-                      checked={formData.hasBroker} 
-                      onChange={e => setFormData({...formData, hasBroker: e.target.checked})} 
+                    <input
+                      type="checkbox"
+                      className="w-5 h-5 rounded text-amber-600"
+                      checked={!!formData.hasBroker}
+                      onChange={e =>
+                        setFormData({
+                          ...formData,
+                          hasBroker: e.target.checked,
+                        })
+                      }
                     />
-                    <span className="text-sm font-bold text-slate-700">¿Asiste con Corredor?</span>
+                    <span className="text-sm font-bold text-slate-700">
+                      ¿Asiste con Corredor?
+                    </span>
                   </label>
                   {formData.hasBroker && (
-                    <input 
-                      className="w-full p-3 border rounded-xl mt-2 animate-in fade-in" 
+                    <input
+                      className="w-full p-3 border rounded-xl mt-2"
                       placeholder="Nombre del Corredor / Empresa"
                       value={formData.brokerName || ''}
-                      onChange={e => setFormData({...formData, brokerName: e.target.value})}
+                      onChange={e =>
+                        setFormData({
+                          ...formData,
+                          brokerName: e.target.value,
+                        })
+                      }
                     />
                   )}
                 </div>
               </div>
 
+              {/* Comentarios */}
               <div>
-                <label className="block text-sm font-bold text-slate-700 mb-2">Resultado / Comentarios</label>
-                <textarea 
-                  required 
-                  className="w-full p-3 border rounded-xl h-24" 
-                  placeholder="Resumen de la visita, interés del cliente, etc." 
-                  value={formData.comments || ''} 
-                  onChange={e => setFormData({...formData, comments: e.target.value})} 
+                <label className="block text-sm font-bold text-slate-700 mb-2">
+                  Resultado / Comentarios
+                </label>
+                <textarea
+                  required
+                  className="w-full p-3 border rounded-xl h-24"
+                  placeholder="Resumen de la visita, interés del cliente, etc."
+                  value={formData.comments || ''}
+                  onChange={e =>
+                    setFormData({
+                      ...formData,
+                      comments: e.target.value,
+                    })
+                  }
                 />
               </div>
 
+              {/* Oferta */}
               <div>
-                <label className="block text-sm font-bold text-slate-700 mb-2">Oferta (Opcional)</label>
+                <label className="block text-sm font-bold text-slate-700 mb-2">
+                  Oferta (Opcional)
+                </label>
                 <div className="relative">
-                  <DollarSign className="w-5 h-5 absolute left-3 top-3 text-slate-400"/>
-                  <input 
-                    type="number" 
-                    className="w-full pl-10 p-3 border rounded-xl" 
-                    placeholder="Monto en UF" 
-                    value={formData.offerUF || ''} 
-                    onChange={e => setFormData({...formData, offerUF: Number(e.target.value)})} 
+                  <DollarSign className="w-5 h-5 absolute left-3 top-3 text-slate-400" />
+                  <input
+                    type="number"
+                    className="w-full pl-10 p-3 border rounded-xl"
+                    placeholder="Monto en UF"
+                    value={formData.offerUF || ''}
+                    onChange={e =>
+                      setFormData({
+                        ...formData,
+                        offerUF: Number(e.target.value),
+                      })
+                    }
                   />
                 </div>
               </div>
 
+              {/* Compromiso */}
               <div className="bg-blue-50 p-6 rounded-xl border border-blue-100">
                 <h4 className="font-bold text-blue-800 mb-4 flex items-center gap-2">
-                  <ClipboardList className="w-5 h-5"/> Compromiso / Siguiente Paso
+                  <ClipboardList className="w-5 h-5" /> Compromiso / Siguiente Paso
                 </h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="md:col-span-2">
-                    <label className="block text-sm font-bold text-slate-700 mb-1">Acción a Realizar</label>
-                    <input 
-                      required 
-                      className="w-full p-3 border rounded-xl" 
-                      placeholder="Ej: Enviar planos, Llamar para respuesta..." 
-                      value={formData.nextAction || ''} 
-                      onChange={e => setFormData({...formData, nextAction: e.target.value})} 
+                    <label className="block text-sm font-bold text-slate-700 mb-1">
+                      Acción a Realizar
+                    </label>
+                    <input
+                      required
+                      className="w-full p-3 border rounded-xl"
+                      placeholder="Ej: Enviar planos, Llamar para respuesta..."
+                      value={formData.nextAction || ''}
+                      onChange={e =>
+                        setFormData({
+                          ...formData,
+                          nextAction: e.target.value,
+                        })
+                      }
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-1">Fecha Límite</label>
-                    <input 
-                      type="date" 
-                      required 
-                      className="w-full p-3 border rounded-xl" 
-                      value={formData.nextActionDate || ''} 
-                      onChange={e => setFormData({...formData, nextActionDate: e.target.value})} 
+                    <label className="block text-sm font-bold text-slate-700 mb-1">
+                      Fecha Límite
+                    </label>
+                    <input
+                      type="date"
+                      required
+                      className="w-full p-3 border rounded-xl"
+                      value={formData.nextActionDate || ''}
+                      onChange={e =>
+                        setFormData({
+                          ...formData,
+                          nextActionDate: e.target.value,
+                        })
+                      }
                     />
                   </div>
                 </div>
               </div>
 
+              {/* Botones */}
               <div className="flex gap-4 pt-4">
-                <button 
-                  type="button" 
-                  onClick={() => setIsModalOpen(false)} 
+                <button
+                  type="button"
+                  onClick={() => setIsModalOpen(false)}
                   className="flex-1 py-3 text-slate-500 font-bold hover:bg-slate-100 rounded-xl"
                 >
                   Cancelar
                 </button>
-                <button 
-                  type="submit" 
+                <button
+                  type="submit"
                   className="flex-1 py-3 bg-amber-600 text-white font-bold rounded-xl hover:bg-amber-700 shadow-lg"
                 >
                   Registrar Visita
@@ -1906,12 +2140,14 @@ const VisitsPage = () => {
         </div>
       )}
 
-      {/* View/Edit Modals */}
-      {viewVisit && <VisitDetailModal visit={viewVisit} onClose={() => setViewVisit(null)} />}
+      {/* View / Gestionar / Historial cliente */}
+      {viewVisit && (
+        <VisitDetailModal visit={viewVisit} onClose={() => setViewVisit(null)} />
+      )}
       {selectedVisitForAction && (
-        <ActionModal 
-          visit={selectedVisitForAction} 
-          onClose={() => setSelectedVisitForAction(null)} 
+        <ActionModal
+          visit={selectedVisitForAction}
+          onClose={() => setSelectedVisitForAction(null)}
           onUpdate={refreshVisits}
         />
       )}
@@ -1925,6 +2161,8 @@ const VisitsPage = () => {
     </div>
   );
 };
+
+
 
 // 4. REPORTS PAGE
 const ReportsPage = () => {
