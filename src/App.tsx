@@ -2556,10 +2556,40 @@ const App = () => {
   const [user, setUser] = useState<any>(null);
   const [activeTab, setActiveTab] = useState('dashboard');
 
+  const [ufValue, setUfValue] = useState<number | null>(null);
+  const [ufDate, setUfDate] = useState<string>('');
+  const [ufError, setUfError] = useState<string | null>(null);
+
+    useEffect(() => {
+    const fetchUF = async () => {
+      try {
+        const res = await fetch('https://mindicador.cl/api/uf');
+        const data = await res.json();
+
+        // La API entrega la UF en data.serie[0]
+        const latest = data.serie && data.serie[0];
+        if (latest) {
+          setUfValue(latest.valor);
+          setUfDate(new Date(latest.fecha).toLocaleDateString('es-CL'));
+        } else {
+          setUfError('Sin datos de UF');
+        }
+      } catch (err) {
+        console.error(err);
+        setUfError('No se pudo cargar la UF');
+      }
+    };
+
+    fetchUF();
+  }, []);
+
+
 
   if (!user) {
     return <LoginScreen onLogin={setUser} />;
   }
+
+const todayStr = new Date().toLocaleDateString('es-CL');
 
   return (
     <div className="min-h-screen flex flex-col md:flex-row font-sans text-slate-600 bg-slate-50">
@@ -2621,6 +2651,27 @@ const App = () => {
 
       {/* Main Content */}
       <main className="flex-1 p-6 overflow-y-auto max-h-screen pb-10">
+      {/* Barra UF + Fecha */}
+<div className="mb-6 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 
+                bg-white border border-slate-200 rounded-xl px-4 py-3 shadow-sm text-sm">
+
+  <span>
+    Fecha hoy: <b>{new Date().toLocaleDateString("es-CL")}</b>
+  </span>
+
+  <span>
+    UF hoy:{" "}
+    {ufError ? (
+      <span className="text-red-600">{ufError}</span>
+    ) : ufValue ? (
+      <b>{ufValue.toLocaleString("es-CL")} CLP</b>
+    ) : (
+      "cargando..."
+    )}
+  </span>
+
+</div>
+
         {/* Mobile Header */}
         <div className="md:hidden bg-slate-900 text-white p-4 flex justify-between items-center sticky top-0 z-30 shadow-md">
            <span className="font-bold">SAUMA</span>
