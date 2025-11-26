@@ -173,6 +173,7 @@ interface Property {
   landM2: number;
   builtM2: number;
   storageM2?: number;
+  condominium?: string;
   priceUF: number;
   status: PropertyStatus;
   owner: string;
@@ -1350,7 +1351,8 @@ const PropertiesPage = ({ user }: { user: any }) => {
     priceUF: 0,
     storageM2: 0,
     address: '',
-    owner: '',
+    owner: '', 
+    condominium: '', // opcional
   };
 
   const [formData, setFormData] = useState<Partial<Property>>(initialForm);
@@ -1561,6 +1563,12 @@ const PropertiesPage = ({ user }: { user: any }) => {
               <h3 className="text-xl font-bold text-slate-800">
   {p.address}, {p.commune}
 </h3>
+{/* Condominio (solo si existe) */}
+{p.condominium && (
+  <p className="text-sm text-slate-500">
+    Condominio: <span className="font-semibold">{p.condominium}</span>
+  </p>
+)}
 
 {/* Dueño de la propiedad */}
 <p className="text-sm text-slate-600">
@@ -1649,6 +1657,17 @@ const PropertiesPage = ({ user }: { user: any }) => {
                    <label className="block text-sm font-bold text-slate-700 mb-2">Dirección</label>
                    <input required className="w-full p-3 border rounded-xl text-base" value={formData.address || ''} onChange={e => setFormData({...formData, address: e.target.value})} />
                 </div>
+                 {/* ⭐ NUEVO: Condominio (opcional) */}
+  <div>
+    <label className="block text-sm font-bold text-slate-700 mb-2">
+      Condominio (opcional)
+    </label>
+    <input
+      className="w-full p-3 border rounded-xl text-base"
+      value={formData.condominium || ''}
+      onChange={e => setFormData({ ...formData, condominium: e.target.value })}
+    />
+  </div>
                 <div>
                    <label className="block text-sm font-bold text-slate-700 mb-2">Comuna</label>
                    <select required className="w-full p-3 border rounded-xl text-base bg-white" value={formData.commune} onChange={e => setFormData({...formData, commune: e.target.value})}>
