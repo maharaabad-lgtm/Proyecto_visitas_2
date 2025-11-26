@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
   LayoutDashboard, 
@@ -172,6 +173,7 @@ interface Property {
   builtM2: number;
   priceUF: number;
   status: PropertyStatus;
+  owner: string;
   
   // Status Specific Data
   vacancyStartDate?: string; // For AVAILABLE (to calc days empty)
@@ -1303,7 +1305,8 @@ const PropertiesPage = ({ user }: { user: any }) => {
     landM2: 0,
     builtM2: 0,
     priceUF: 0,
-    address: ''
+    address: '',
+    owner: ''
   };
 
   const [formData, setFormData] = useState<Partial<Property>>(initialForm);
@@ -1511,12 +1514,24 @@ const PropertiesPage = ({ user }: { user: any }) => {
 
 </div>
 
-              <h3 className="text-xl font-bold text-slate-800">{p.address}, {p.commune}</h3>
-              
-              <div className="flex gap-6 text-sm text-slate-600">
-                <span className="flex items-center gap-1"><Building2 className="w-4 h-4" /> <b>{p.builtM2}</b> m² const.</span>
-                <span className="flex items-center gap-1"><MapPin className="w-4 h-4" /> <b>{p.landM2}</b> m² terr.</span>
-              </div>
+              <h3 className="text-xl font-bold text-slate-800">
+  {p.address}, {p.commune}
+</h3>
+
+{/* Dueño de la propiedad */}
+<p className="text-sm text-slate-600">
+  Dueño: <span className="font-semibold">{p.owner || 'No informado'}</span>
+</p>
+
+<div className="flex gap-6 text-sm text-slate-600">
+  <span className="flex items-center gap-1">
+    <Building2 className="w-4 h-4" /> <b>{p.builtM2}</b> m² const.
+  </span>
+  <span className="flex items-center gap-1">
+    <MapPin className="w-4 h-4" /> <b>{p.landM2}</b> m² terr.
+  </span>
+</div>
+
 
               {/* Status Specific Info */}
               <div className="pt-2 flex flex-col md:flex-row gap-4 items-start md:items-center">
@@ -1590,6 +1605,16 @@ const PropertiesPage = ({ user }: { user: any }) => {
                    <select required className="w-full p-3 border rounded-xl text-base bg-white" value={formData.commune} onChange={e => setFormData({...formData, commune: e.target.value})}>
                      {COMUNAS_CHILE.map(c => ( <option key={c} value={c}>{c}</option>))}
                    </select>
+                </div>
+                <div>
+                   <label className="block text-sm font-bold text-slate-700 mb-2">
+                     Dueño de la propiedad
+                   </label>
+                   <input
+                     className="w-full p-3 border rounded-xl text-base"
+                     value={formData.owner || ''}
+                     onChange={e => setFormData({ ...formData, owner: e.target.value })}
+                   />
                 </div>
                 <div>
                    <label className="block text-sm font-bold text-slate-700 mb-2">Tipo Inmueble</label>
