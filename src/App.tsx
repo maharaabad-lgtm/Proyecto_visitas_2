@@ -172,7 +172,7 @@ interface Property {
   type: string;
   landM2: number;
   builtM2: number;
-  storageM2: number;
+  storageM2?: number;
   priceUF: number;
   status: PropertyStatus;
   owner: string;
