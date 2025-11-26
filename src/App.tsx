@@ -2567,7 +2567,7 @@ const App = () => {
       <aside className="w-full md:w-72 bg-slate-900 text-white flex flex-col shadow-xl z-20">
         <div className="p-8">
           <h1 className="text-2xl font-bold tracking-tight">SAUMA <span className="text-amber-500">HERMANOS</span></h1>
-          <p className="text-slate-500 text-sm mt-1">Gestión Inmobiliaria</p>
+          <p className="text-slate-500 text-sm mt-1">Inmobiliaria</p>
         </div>
         
         <nav className="flex-1 px-4 space-y-2">
@@ -2620,7 +2620,7 @@ const App = () => {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-y-auto h-screen bg-slate-50">
+      <main className="flex-1 p-6 overflow-y-auto max-h-screen pb-10">
         {/* Mobile Header */}
         <div className="md:hidden bg-slate-900 text-white p-4 flex justify-between items-center sticky top-0 z-30 shadow-md">
            <span className="font-bold">SAUMA</span>
