@@ -1325,7 +1325,23 @@ const Dashboard = ({ setActiveTab }: { setActiveTab: (tab: string) => void }) =>
 };
 
 // 2. PROPERTIES PAGE
-const PropertiesPage = ({ user }: { user: any }) => {
+const PropertiesPage = ({
+  user,
+  ufValue,
+}: {
+  user: any;
+  ufValue: number | null;
+}) => {
+
+    const formatCLP = (value: number | null) => {
+    if (value === null) return '—';
+    return value.toLocaleString('es-CL', {
+      style: 'currency',
+      currency: 'CLP',
+      maximumFractionDigits: 0,
+    });
+  };
+
   const [properties, setProperties] = useState<Property[]>(Service.getProperties());
   const [visits, setVisits] = useState<Visit[]>(Service.getVisits());
   const [filterStatus, setFilterStatus] = useState<string>('ALL');
@@ -1623,10 +1639,28 @@ const PropertiesPage = ({ user }: { user: any }) => {
               </div>
             </div>
 
-            <div className="flex flex-col items-end justify-center border-t md:border-t-0 md:border-l border-slate-100 pt-4 md:pt-0 md:pl-6 min-w-[150px]">
-              <div className="text-3xl font-bold text-slate-800">{formatUF(p.priceUF)}</div>
-              <div className="text-xs text-slate-400 uppercase tracking-wider font-medium">Valor Lista</div>
-            </div>
+            <div className="flex flex-col items-end justify-center border-t md:border-t-0 md:border-l border-slate-100 pt-4 md:pt-0 md:pl-6 min-w-[170px]">
+  {/* Precio en UF */}
+  <div className="text-3xl font-bold text-slate-800">
+    {formatUF(p.priceUF)}
+  </div>
+  <div className="text-xs text-slate-400 uppercase tracking-wider font-medium">
+    Valor lista (UF)
+  </div>
+
+  {/* Precio en CLP, calculado con la UF del día */}
+  {ufValue !== null && (
+    <>
+      <div className="text-sm font-semibold text-slate-700 mt-2">
+        {formatCLP(p.priceUF * ufValue)}
+      </div>
+      <div className="text-[10px] text-slate-400 uppercase tracking-wider">
+        Referencia hoy en CLP
+      </div>
+    </>
+  )}
+</div>
+
           </div>
           )
         })}
@@ -1657,6 +1691,25 @@ const PropertiesPage = ({ user }: { user: any }) => {
                    <label className="block text-sm font-bold text-slate-700 mb-2">Dirección</label>
                    <input required className="w-full p-3 border rounded-xl text-base" value={formData.address || ''} onChange={e => setFormData({...formData, address: e.target.value})} />
                 </div>
+  <div>
+  <label className="block text-sm font-bold text-slate-700 mb-2">
+    Precio estimado hoy (CLP)
+  </label>
+  <input
+    type="text"
+    readOnly
+    className="w-full p-3 border rounded-xl text-base bg-slate-100 text-slate-600"
+    value={
+      ufValue !== null && formData.priceUF
+        ? formatCLP(formData.priceUF * ufValue)
+        : '—'
+    }
+  />
+  <p className="text-xs text-slate-400 mt-1">
+    Cálculo automático: UF ingresada × UF del día.
+  </p>
+</div>
+              
                  {/* ⭐ NUEVO: Condominio (opcional) */}
   <div>
     <label className="block text-sm font-bold text-slate-700 mb-2">
@@ -2783,7 +2836,8 @@ const todayStr = new Date().toLocaleDateString('es-CL');
 
         <div className="p-6 md:p-10 max-w-7xl mx-auto pb-20">
           {activeTab === 'dashboard' && <Dashboard setActiveTab={setActiveTab} />}
-          {activeTab === 'properties' && <PropertiesPage user={user} />}
+          {activeTab === 'properties' && (<PropertiesPage user={user} ufValue={ufValue} />
+)}
           {activeTab === 'visits' && <VisitsPage />}
           {activeTab === 'reports' && <ReportsPage />}
           {activeTab === 'alerts' && <Dashboard setActiveTab={setActiveTab} />} {/* Redirect to dashboard for now */}
