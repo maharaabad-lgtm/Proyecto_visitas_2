@@ -2556,32 +2556,33 @@ const App = () => {
   const [user, setUser] = useState<any>(null);
   const [activeTab, setActiveTab] = useState('dashboard');
 
-  const [ufValue, setUfValue] = useState<number | null>(null);
-  const [ufDate, setUfDate] = useState<string>('');
-  const [ufError, setUfError] = useState<string | null>(null);
+const [ufValue, setUfValue] = useState<number | null>(null);
+// eliminamos ufDate porque no la usas
+const [ufError, setUfError] = useState<string | null>(null);
 
-    useEffect(() => {
-    const fetchUF = async () => {
-      try {
-        const res = await fetch('https://mindicador.cl/api/uf');
-        const data = await res.json();
+useEffect(() => {
+  const fetchUF = async () => {
+    try {
+      const res = await fetch('https://mindicador.cl/api/uf');
+      const data = await res.json();
 
-        // La API entrega la UF en data.serie[0]
-        const latest = data.serie && data.serie[0];
-        if (latest) {
-          setUfValue(latest.valor);
-          setUfDate(new Date(latest.fecha).toLocaleDateString('es-CL'));
-        } else {
-          setUfError('Sin datos de UF');
-        }
-      } catch (err) {
-        console.error(err);
-        setUfError('No se pudo cargar la UF');
+      const latest = data.serie && data.serie[0];
+      if (latest) {
+        setUfValue(latest.valor);
+        // eliminamos esta línea porque ya no existe ufDate:
+        // setUfDate(new Date(latest.fecha).toLocaleDateString('es-CL'));
+      } else {
+        setUfError('Sin datos de UF');
       }
-    };
+    } catch (err) {
+      console.error(err);
+      setUfError('No se pudo cargar la UF');
+    }
+  };
 
-    fetchUF();
-  }, []);
+  fetchUF();
+}, []);
+
 
 
 
@@ -2656,7 +2657,7 @@ const todayStr = new Date().toLocaleDateString('es-CL');
                 bg-white border border-slate-200 rounded-xl px-4 py-3 shadow-sm text-sm">
 
   <span>
-    Fecha hoy: <b>{new Date().toLocaleDateString("es-CL")}</b>
+    Fecha hoy: <b>{todayStr}</b>
   </span>
 
   <span>
