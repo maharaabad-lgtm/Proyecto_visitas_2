@@ -260,16 +260,57 @@ const Service = {
       localStorage.setItem(STORAGE_KEYS.PROPERTIES, JSON.stringify(properties));
     }
     
-    // Seed if empty
-    if (properties.length === 0) {
-        const seed: Property[] = [
-            { id: 'P-1001', address: 'Av. Providencia 1234', commune: 'Providencia', type: 'Oficina', landM2: 0, builtM2: 120, priceUF: 4500, status: 'AVAILABLE', vacancyStartDate: '2023-10-01', createdAt: '2023-01-01', updatedAt: '2023-01-01' },
-            { id: 'P-1002', address: 'El Golf 500', commune: 'Las Condes', type: 'Oficina', landM2: 0, builtM2: 200, priceUF: 12000, status: 'LEASED', currentTenant: 'Tech Corp', leaseEndDate: '2025-12-31', createdAt: '2023-01-01', updatedAt: '2023-01-01' },
-            { id: 'P-1003', address: 'Vitacura 3000', commune: 'Vitacura', type: 'Local Comercial', landM2: 300, builtM2: 150, priceUF: 15000, status: 'NOTICE_GIVEN', noticeEndDate: '2023-12-01', createdAt: '2023-01-01', updatedAt: '2023-01-01' },
-        ];
-        localStorage.setItem(STORAGE_KEYS.PROPERTIES, JSON.stringify(seed));
-        return seed;
+   // Seed if empty
+if (properties.length === 0) {
+  const seed: Property[] = [
+    {
+      id: 'P-1001',
+      address: 'Av. Providencia 1234',
+      commune: 'Providencia',
+      type: 'Oficina',
+      landM2: 0,
+      builtM2: 120,
+      priceUF: 4500,
+      status: 'AVAILABLE',
+      vacancyStartDate: '2023-10-01',
+      owner: 'Dueño demo 1',
+      createdAt: '2023-01-01',
+      updatedAt: '2023-01-01'
+    },
+    {
+      id: 'P-1002',
+      address: 'El Golf 500',
+      commune: 'Las Condes',
+      type: 'Oficina',
+      landM2: 0,
+      builtM2: 200,
+      priceUF: 12000,
+      status: 'LEASED',
+      currentTenant: 'Tech Corp',
+      leaseEndDate: '2025-12-31',
+      owner: 'Dueño demo 2',
+      createdAt: '2023-01-01',
+      updatedAt: '2023-01-01'
+    },
+    {
+      id: 'P-1003',
+      address: 'Vitacura 3000',
+      commune: 'Vitacura',
+      type: 'Local Comercial',
+      landM2: 300,
+      builtM2: 150,
+      priceUF: 15000,
+      status: 'NOTICE_GIVEN',
+      noticeEndDate: '2023-12-01',
+      owner: 'Dueño demo 3',
+      createdAt: '2023-01-01',
+      updatedAt: '2023-01-01'
     }
+  ];
+  localStorage.setItem(STORAGE_KEYS.PROPERTIES, JSON.stringify(seed));
+  return seed;
+}
+
 
     return properties;
   },
