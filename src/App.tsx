@@ -1306,7 +1306,7 @@ const PropertiesPage = ({ user }: { user: any }) => {
     builtM2: 0,
     priceUF: 0,
     address: '',
-    owner: ''
+    owner: '',
   };
 
   const [formData, setFormData] = useState<Partial<Property>>(initialForm);
