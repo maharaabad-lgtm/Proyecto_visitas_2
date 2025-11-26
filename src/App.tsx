@@ -14,6 +14,7 @@ import {
   Clock,
   MapPin,
   TrendingUp,
+  Warehouse,
   TrendingDown,
   History,
   LogOut,
@@ -171,6 +172,7 @@ interface Property {
   type: string;
   landM2: number;
   builtM2: number;
+  storageM2: number;
   priceUF: number;
   status: PropertyStatus;
   owner: string;
@@ -1346,6 +1348,7 @@ const PropertiesPage = ({ user }: { user: any }) => {
     landM2: 0,
     builtM2: 0,
     priceUF: 0,
+    storageM2: 0,
     address: '',
     owner: '',
   };
@@ -1573,6 +1576,11 @@ const PropertiesPage = ({ user }: { user: any }) => {
   </span>
 </div>
 
+<span className="flex items-center gap-1">
+  <Warehouse className="w-4 h-4" /> 
+  <b>{p.storageM2 || 0}</b> m² bodega
+</span>
+
 
               {/* Status Specific Info */}
               <div className="pt-2 flex flex-col md:flex-row gap-4 items-start md:items-center">
@@ -1675,6 +1683,15 @@ const PropertiesPage = ({ user }: { user: any }) => {
                    <label className="block text-sm font-bold text-slate-700 mb-2">M² Construidos</label>
                    <input type="number" className="w-full p-3 border rounded-xl text-base" value={formData.builtM2 || ''} onChange={e => setFormData({...formData, builtM2: Number(e.target.value)})} />
                 </div>
+                <div>
+  <label className="block text-sm font-bold text-slate-700 mb-2">M² Bodega</label>
+  <input 
+    type="number"
+    className="w-full p-3 border rounded-xl text-base"
+    value={formData.storageM2 || ''}
+    onChange={e => setFormData({...formData, storageM2: Number(e.target.value)})}
+  />
+</div>
               </div>
 
               <div className="bg-slate-50 p-6 rounded-xl border border-slate-200">
