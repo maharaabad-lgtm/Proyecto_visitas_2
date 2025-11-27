@@ -747,6 +747,418 @@ const StatusBadge = ({
     </span>
   );
 };
+const ActionModal = ({ visit, onClose, onUpdate }: { visit: Visit, onClose: () => void, onUpdate: () => void }) => {
+  const [mode, setMode] = useState<'SELECT' | 'NEW'>('SELECT');
+  const [newAction, setNewAction] = useState('');
+  const [newDate, setNewDate] = useState('');
+
+  const handleMarkDone = () => {
+    Service.processActionUpdate(visit.id, 'MARK_DONE');
+    onUpdate();
+    onClose();
+  };
+
+  const handleNewAction = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newAction || !newDate) return;
+    Service.processActionUpdate(visit.id, 'NEW_ACTION', { action: newAction, date: newDate });
+    onUpdate();
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-50 p-4 backdrop-blur-sm" onClick={onClose}>
+      <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl" onClick={e => e.stopPropagation()}>
+        <div className="flex justify-between items-start mb-4 border-b pb-4">
+          <h3 className="text-xl font-bold text-slate-800">Gestionar Compromiso</h3>
+          <button onClick={onClose}><X className="w-5 h-5 text-slate-400 hover:text-slate-600" /></button>
+        </div>
+
+        <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 mb-6">
+          <p className="text-xs font-bold text-slate-500 uppercase mb-1">Compromiso Actual</p>
+          <p className="font-bold text-slate-800 text-lg">{visit.nextAction}</p>
+          <div className="flex justify-between items-center mt-2">
+            <span className="text-sm text-slate-600">Fecha: {visit.nextActionDate}</span>
+            <StatusBadge status={visit.actionStatus} />
+          </div>
+        </div>
+
+        {mode === 'SELECT' ? (
+          <div className="space-y-3">
+            {visit.actionStatus !== 'DONE' && (
+              <button
+                onClick={handleMarkDone}
+                className="w-full bg-green-600 hover:bg-green-700 text-white p-4 rounded-xl flex items-center justify-between group transition-all"
+              >
+                <div className="text-left">
+                  <span className="block font-bold">Marcar como REALIZADO</span>
+                  <span className="text-green-200 text-xs">La tarea se guardará como completada</span>
+                </div>
+                <CheckCircle2 className="w-6 h-6 text-green-200 group-hover:text-white" />
+              </button>
+            )}
+
+            <button
+              onClick={() => setMode('NEW')}
+              className="w-full bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 p-4 rounded-xl flex items-center justify-between group transition-all"
+            >
+              <div className="text-left">
+                <span className="block font-bold">Programar NUEVA ACCIÓN</span>
+                <span className="text-amber-700 text-xs">Archiva la actual y crea una nueva</span>
+              </div>
+              <Calendar className="w-6 h-6 text-amber-600" />
+            </button>
+          </div>
+        ) : (
+          <form onSubmit={handleNewAction} className="space-y-4 animate-in fade-in">
+            <div>
+              <label className="block text-sm font-bold text-slate-700 mb-1">Nueva Acción / Tarea</label>
+              <input
+                required
+                autoFocus
+                className="w-full p-3 border rounded-xl"
+                placeholder="Ej: Llamar nuevamente, Enviar correo..."
+                value={newAction}
+                onChange={e => setNewAction(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-bold text-slate-700 mb-1">Fecha Límite</label>
+              <input
+                required
+                type="date"
+                className="w-full p-3 border rounded-xl"
+                value={newDate}
+                onChange={e => setNewDate(e.target.value)}
+              />
+            </div>
+            <div className="flex gap-3 pt-2">
+              <button type="button" onClick={() => setMode('SELECT')} className="flex-1 py-3 text-slate-500 font-bold hover:bg-slate-100 rounded-xl">Volver</button>
+              <button type="submit" className="flex-1 py-3 bg-amber-600 text-white font-bold rounded-xl hover:bg-amber-700">Guardar</button>
+            </div>
+          </form>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// LEASE RESOLUTION MODAL
+const LeaseResolutionModal = ({ propertyId, winnerClientName, onComplete, onCancel }: { propertyId: string, winnerClientName: string, onComplete: () => void, onCancel: () => void }) => {
+  const [pendingWinnerVisits, setPendingWinnerVisits] = useState<Visit[]>([]);
+
+  useEffect(() => {
+    const visits = Service.getVisits();
+    const winnerVisits = visits.filter(v =>
+      v.propertyId === propertyId &&
+      v.actionStatus === 'PENDING' &&
+      v.clientName === winnerClientName
+    );
+    setPendingWinnerVisits(winnerVisits);
+  }, [propertyId, winnerClientName]);
+
+  const handleResolveWinnerVisit = (visit: Visit) => {
+    Service.processActionUpdate(visit.id, 'MARK_DONE');
+    setPendingWinnerVisits(prev => prev.filter(v => v.id !== visit.id));
+  };
+
+  const hasPending = pendingWinnerVisits.length > 0;
+
+  return (
+    <div className="fixed inset-0 bg-slate-900/80 flex items-center justify-center z-[60] p-4 backdrop-blur-sm">
+      <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl animate-in fade-in zoom-in">
+        <div className="text-center mb-6">
+          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Lock className="w-8 h-8 text-green-600" />
+          </div>
+          <h3 className="text-2xl font-bold text-slate-800">Cierre de Propiedad</h3>
+          <p className="text-slate-500 mt-2">
+            Estás marcando la propiedad como <b>ARRENDADA</b> a <span className="font-bold text-slate-800">{winnerClientName}</span>.
+          </p>
+        </div>
+
+        {hasPending ? (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
+            <h4 className="font-bold text-amber-800 flex items-center gap-2 mb-2">
+              <AlertTriangle className="w-5 h-5" /> Acción Requerida
+            </h4>
+            <p className="text-sm text-amber-700 mb-4">
+              Existen compromisos pendientes con el cliente ganador. Debes resolverlos (marcar como cumplidos) antes de finalizar el cierre.
+            </p>
+
+            <div className="space-y-3 max-h-60 overflow-y-auto">
+              {pendingWinnerVisits.map(v => (
+                <div key={v.id} className="bg-white p-3 rounded-lg border border-amber-200 shadow-sm flex justify-between items-center">
+                  <div>
+                    <p className="font-bold text-slate-800 text-sm">{v.nextAction}</p>
+                    <p className="text-xs text-slate-500">{v.nextActionDate}</p>
+                  </div>
+                  <button
+                    onClick={() => handleResolveWinnerVisit(v)}
+                    className="bg-green-600 hover:bg-green-700 text-white text-xs font-bold px-3 py-2 rounded-lg transition-colors"
+                  >
+                    CUMPLIR
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="bg-green-50 border border-green-200 rounded-xl p-4 mb-6 flex items-center gap-3">
+            <CheckCircle2 className="w-6 h-6 text-green-600" />
+            <p className="text-green-800 text-sm font-medium">Todo listo con el cliente ganador.</p>
+          </div>
+        )}
+
+        <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 mb-6">
+          <p className="text-xs font-bold text-slate-500 uppercase mb-2">Acciones Automáticas</p>
+          <ul className="text-sm text-slate-600 space-y-2">
+            <li className="flex items-start gap-2">
+              <Check className="w-4 h-4 text-slate-400 mt-0.5" />
+              <span>Se cerrarán automáticamente los compromisos pendientes de <b>otros clientes</b> con la nota: "Propiedad ya no está disponible".</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <Check className="w-4 h-4 text-slate-400 mt-0.5" />
+              <span>El historial de visitas se mantendrá intacto para futuras gestiones.</span>
+            </li>
+          </ul>
+        </div>
+
+        <div className="flex gap-3">
+          <button
+            onClick={onCancel}
+            className="flex-1 py-3 text-slate-600 font-bold hover:bg-slate-100 rounded-xl"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={onComplete}
+            disabled={hasPending}
+            className={`flex-1 py-3 font-bold rounded-xl text-white transition-all ${hasPending ? 'bg-slate-300 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700 shadow-lg'}`}
+          >
+            Confirmar Cierre
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const ClientHistoryModal = ({ clientName, visits, onClose }: { clientName: string, visits: Visit[], onClose: () => void }) => {
+  const clientVisits = visits
+    .filter(v => v.clientName === clientName)
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  const properties = Service.getProperties();
+
+  return (
+    <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-50 p-4 backdrop-blur-sm" onClick={onClose}>
+      <div className="bg-white rounded-2xl max-w-2xl w-full p-0 shadow-2xl animate-in fade-in zoom-in duration-200 max-h-[90vh] overflow-y-auto flex flex-col" onClick={e => e.stopPropagation()}>
+        {/* Header */}
+        <div className="p-6 border-b border-slate-100 bg-slate-50 rounded-t-2xl">
+          <div className="flex justify-between items-start">
+            <div>
+              <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                <User className="w-6 h-6 text-amber-600" /> {clientName}
+              </h3>
+              <p className="text-sm text-slate-500 mt-1">Hoja de vida del cliente y seguimiento de negociaciones.</p>
+            </div>
+            <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><X className="w-6 h-6" /></button>
+          </div>
+        </div>
+
+        <div className="p-6 space-y-8 overflow-y-auto">
+          {clientVisits.length === 0 ? (
+            <p className="text-center text-slate-500 italic">No hay historial disponible para este cliente.</p>
+          ) : (
+            clientVisits.map(visit => {
+              const prop = properties.find(p => p.id === visit.propertyId);
+              return (
+                <div key={visit.id} className="relative pl-8 before:absolute before:left-3 before:top-8 before:bottom-0 before:w-0.5 before:bg-slate-200 last:before:bg-transparent">
+                  <div className="absolute left-0 top-1 bg-slate-200 p-1.5 rounded-full text-slate-500">
+                    <Building2 className="w-3 h-3" />
+                  </div>
+
+                  <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm mb-2">
+                    <div className="flex flex-col sm:flex-row justify-between sm:items-center mb-3 gap-2 border-b border-slate-50 pb-2">
+                      <div>
+                        <span className="text-xs font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded mb-1 inline-block">VISITA: {visit.date}</span>
+                        <h4 className="font-bold text-slate-800">{prop?.address || visit.propertyId}</h4>
+                      </div>
+                      <div className="text-xs text-right text-slate-500">
+                        <p>Ejecutivo: {visit.executiveName}</p>
+                        {visit.offerUF && <p className="font-bold text-green-600">Oferta: {formatUF(visit.offerUF)}</p>}
+                      </div>
+                    </div>
+
+                    <p className="text-sm text-slate-600 italic mb-4">"{visit.comments}"</p>
+
+                    <div className="bg-slate-50 rounded-lg p-3 space-y-3">
+                      <h5 className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1">
+                        <History className="w-3 h-3" /> Historial de Compromisos
+                      </h5>
+
+                      {visit.history?.map((h, idx) => (
+                        <div key={idx} className="flex items-start gap-3 text-sm opacity-70">
+                          <div className="mt-0.5">
+                            {h.status === 'DONE' ? <CheckCircle2 className="w-4 h-4 text-green-500" /> : <Edit className="w-4 h-4 text-slate-400" />}
+                          </div>
+                          <div>
+                            <p className="font-medium text-slate-700 line-through">{h.action}</p>
+                            <p className="text-xs text-slate-500">
+                              {h.status === 'DONE'
+                                ? `Cumplido el ${h.completedDate}`
+                                : (h.status === 'ARCHIVED'
+                                  ? `Archivado: ${h.archivedDate}`
+                                  : `Modificado el ${h.archivedDate}`)}
+                            </p>
+                            {h.note && <p className="text-xs text-slate-400 italic">{h.note}</p>}
+                          </div>
+                        </div>
+                      ))}
+
+                      <div className="flex items-start gap-3 text-sm">
+                        <div className="mt-0.5">
+                          {visit.actionStatus === 'DONE' ? <CheckCircle2 className="w-4 h-4 text-green-600" /> : <Clock className="w-4 h-4 text-blue-600" />}
+                        </div>
+                        <div>
+                          <p className="font-bold text-slate-800">{visit.nextAction}</p>
+                          <p className="text-xs text-slate-500">
+                            {visit.actionStatus === 'DONE'
+                              ? `Realizado el ${visit.actionCompletedDate}`
+                              : `Programado para: ${visit.nextActionDate}`}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const VisitDetailModal = ({ visit, onClose }: { visit: Visit, onClose: () => void }) => {
+  const properties = Service.getProperties();
+  const prop = properties.find(p => p.id === visit.propertyId);
+
+  return (
+    <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-50 p-4 backdrop-blur-sm" onClick={onClose}>
+      <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl animate-in fade-in zoom-in duration-200 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+        <div className="flex justify-between items-start mb-4 border-b pb-4">
+          <h3 className="text-xl font-bold text-slate-800">Detalle de Visita</h3>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><LogOut className="w-5 h-5 rotate-45" /></button>
+        </div>
+
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-xs font-bold text-slate-500 uppercase">Fecha Visita</label>
+              <p className="font-bold text-slate-800 text-lg">{visit.date}</p>
+            </div>
+            <div>
+              <label className="text-xs font-bold text-slate-500 uppercase">Ejecutivo</label>
+              <p className="font-medium text-slate-800">{visit.executiveName}</p>
+            </div>
+          </div>
+
+          <div>
+            <label className="text-xs font-bold text-slate-500 uppercase">Propiedad Visitada</label>
+            <p className="font-bold text-slate-800">{prop?.address || visit.propertyId}</p>
+            <p className="text-sm text-slate-500">{prop?.type} - {prop?.commune}</p>
+          </div>
+
+          <div>
+            <label className="text-xs font-bold text-slate-500 uppercase">Cliente</label>
+            <p className="font-medium text-slate-800 text-lg">{visit.clientName}</p>
+
+            {(visit.clientPhone || visit.clientEmail) && (
+              <div className="flex gap-4 mt-2 text-sm text-slate-600">
+                {visit.clientPhone && <span className="flex items-center gap-1"><Phone className="w-3 h-3 text-amber-600" /> {visit.clientPhone}</span>}
+                {visit.clientEmail && <span className="flex items-center gap-1"><Mail className="w-3 h-3 text-amber-600" /> {visit.clientEmail}</span>}
+              </div>
+            )}
+
+            {visit.hasBroker && (
+              <p className="text-sm text-amber-600 mt-2 font-medium bg-amber-50 p-2 rounded border border-amber-100 inline-block">
+                Asistió con Corredor: {visit.brokerName}
+              </p>
+            )}
+          </div>
+
+          <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+            <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Comentarios</label>
+            <p className="text-slate-700 italic">"{visit.comments}"</p>
+          </div>
+
+          {/* Compromiso actual */}
+          <div className="border-t border-slate-100 pt-4">
+            <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Compromiso Actual</label>
+            <div className={`p-4 rounded-xl border ${visit.actionStatus === 'DONE' ? 'bg-green-50 border-green-100' : 'bg-blue-50 border-blue-100'}`}>
+              <div className="flex justify-between items-start">
+                <div>
+                  <p className="font-bold text-slate-800">{visit.nextAction}</p>
+                  <p className="text-sm text-slate-500">Fecha Límite: {visit.nextActionDate}</p>
+                </div>
+                <StatusBadge status={visit.actionStatus} />
+              </div>
+              {visit.actionStatus === 'DONE' && visit.actionCompletedDate && (
+                <div className="mt-2 text-xs font-bold text-green-700 flex items-center gap-1">
+                  <CheckCircle2 className="w-3 h-3" /> Realizado el {visit.actionCompletedDate}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Historial */}
+          {visit.history && visit.history.length > 0 && (
+            <div className="border-t border-slate-100 pt-4">
+              <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Historial de Acciones</label>
+              <div className="space-y-2">
+                {visit.history.map((h, idx) => (
+                  <div key={idx} className="text-sm p-3 bg-slate-50 rounded-lg border border-slate-100">
+                    <div className="flex justify-between">
+                      <span className="font-bold text-slate-700">{h.action}</span>
+                      <span className={`text-xs px-2 py-0.5 rounded ${h.status === 'DONE' ? 'bg-green-100 text-green-700' : 'bg-slate-200 text-slate-600'}`}>
+                        {h.status === 'DONE' ? 'REALIZADO' : (h.status === 'ARCHIVED' ? 'ARCHIVADO' : h.status)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between mt-1 text-xs text-slate-500">
+                      <span>Prog: {h.scheduledDate}</span>
+                      <span>
+                        {h.status === 'DONE'
+                          ? `Completado: ${h.completedDate}`
+                          : `Archivado: ${h.archivedDate}`}
+                      </span>
+                    </div>
+                    {h.note && <div className="text-xs text-slate-400 mt-1 italic">{h.note}</div>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {visit.offerUF && (
+            <div className="bg-green-50 p-3 rounded-lg border border-green-100 text-center mt-4">
+              <span className="text-green-800 font-bold">Oferta Realizada: {formatUF(visit.offerUF)}</span>
+            </div>
+          )}
+        </div>
+
+        <button
+          onClick={onClose}
+          className="mt-6 w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3 rounded-xl transition-colors"
+        >
+          Cerrar
+        </button>
+      </div>
+    </div>
+  );
+};
+
 
 // 1. DASHBOARD
 const Dashboard = ({ setActiveTab }: { setActiveTab: (tab: string) => void }) => {
