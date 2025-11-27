@@ -32,6 +32,9 @@ import {
   Trash2
 } from 'lucide-react';
 
+import { Services } from './services';
+
+
 // --- CONSTANTS & LISTS ---
 
 const PROPERTY_TYPES = [
@@ -1117,35 +1120,121 @@ const Dashboard = ({ setActiveTab }: { setActiveTab: (tab: string) => void }) =>
   const [alertsData, setAlertsData] = useState(Service.getAlerts());
   const [selectedVisitForAction, setSelectedVisitForAction] = useState<Visit | null>(null);
   const [viewVisit, setViewVisit] = useState<Visit | null>(null);
-  
+
+  // 🔹 Ahora properties viene de Supabase (con backup local)
+  const [properties, setProperties] = useState<Property[]>([]);
+  const allVisits = Service.getVisits();
+
   const refreshAlerts = () => {
     setAlertsData(Service.getAlerts());
   };
 
   useEffect(() => {
+    // refresca alertas como antes
     refreshAlerts();
+
+    // carga propiedades desde Supabase
+    const loadProps = async () => {
+      try {
+        const fromDb = await Services.fetchPropertiesFromSupabase();
+        console.log('Dashboard – propiedades desde Supabase:', fromDb);
+
+        if (!fromDb || fromDb.length === 0) {
+          console.warn('Supabase no devolvió propiedades en Dashboard, uso backup local');
+          setProperties(Service.getProperties());
+          return;
+        }
+
+        const mapped: Property[] = fromDb.map((p: any) => ({
+          id: p.id,
+          address: p.address || '',
+          commune: p.comuna || '',
+          type: p.property_type || 'Oficina',
+          owner: p.owner_name || '',
+          condominium: p.condominium_name || '',
+          priceUF: p.arriendo_publicacion_uf || 0,
+          landM2: p.superficie_terreno || 0,
+          builtM2: p.superficie_construida || 0,
+          storageM2: p.superficie_bodega || 0,
+          status:
+            p.status === 'Disponible'
+              ? 'AVAILABLE'
+              : p.status === 'Arrendado'
+              ? 'LEASED'
+              : p.status === 'Aviso entrega'
+              ? 'NOTICE_GIVEN'
+              : 'AVAILABLE',
+          vacancyStartDate: p.fecha_disponible_desde || '',
+          noticeEndDate: '',
+          leaseStartDate: '',
+          leaseEndDate: '',
+          currentTenant: '',
+          leaseType: 'FIXED',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        }));
+
+        setProperties(mapped);
+      } catch (err) {
+        console.error('Dashboard – error al cargar propiedades desde Supabase:', err);
+        setProperties(Service.getProperties()); // backup si hay error
+      }
+    };
+
+    loadProps();
   }, []);
 
-  const properties = Service.getProperties();
-  const allVisits = Service.getVisits();
-  const { staleProperties, actionAlerts } = alertsData;
+  const { actionAlerts } = alertsData;
+
+  // 🔹 Propiedades críticas: sin visitas por 30 días o más.
+  // Hoy, como no hay visitas registradas, TODAS las propiedades disponibles o con aviso serán críticas.
+  const staleProperties = useMemo(() => {
+    const today = new Date();
+
+    return properties.filter((p) => {
+      // Propiedades arrendadas NO son críticas
+      if (p.status === 'LEASED') return false;
+
+      // Todas las visitas de esta propiedad
+      const visitsForProp = allVisits.filter((v) => v.propertyId === p.id);
+
+      // Si nunca ha tenido visitas → crítica
+      if (visitsForProp.length === 0) return true;
+
+      // Encontrar la última visita válida
+      const lastVisit = visitsForProp
+        .map((v) => new Date(v.date))
+        .filter((d) => !isNaN(d.getTime()))
+        .sort((a, b) => b.getTime() - a.getTime())[0];
+
+      if (!lastVisit) return true;
+
+      const diffDays =
+        (today.getTime() - lastVisit.getTime()) / (1000 * 60 * 60 * 24);
+
+      // Crítica si han pasado 30+ días desde la última visita
+      return diffDays >= 30;
+    });
+  }, [properties, allVisits]);
 
   // Logic for Recent Visits (Last 7 Days)
   const recentVisits = useMemo(() => {
     const now = new Date();
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(now.getDate() - 7);
-    
-    return allVisits.filter(v => {
-       const d = new Date(v.date);
-       return d >= sevenDaysAgo && d <= now;
-    }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+    return allVisits
+      .filter((v) => {
+        const d = new Date(v.date);
+        return d >= sevenDaysAgo && d <= now;
+      })
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }, [allVisits]);
 
   const stats = {
-    AVAILABLE: properties.filter(p => p.status === 'AVAILABLE').length,
-    LEASED: properties.filter(p => p.status === 'LEASED').length,
-    NOTICE: properties.filter(p => p.status === 'NOTICE_GIVEN').length,
+    AVAILABLE: properties.filter((p) => p.status === 'AVAILABLE').length,
+    LEASED: properties.filter((p) => p.status === 'LEASED').length,
+    NOTICE: properties.filter((p) => p.status === 'NOTICE_GIVEN').length,
   };
 
   return (
@@ -1153,33 +1242,35 @@ const Dashboard = ({ setActiveTab }: { setActiveTab: (tab: string) => void }) =>
       {/* Top Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="bg-emerald-50 p-6 rounded-2xl shadow-sm border border-emerald-100">
-           <div className="flex justify-between">
-             <p className="text-emerald-800 font-bold">Disponibles</p>
-             <Building2 className="text-emerald-600 w-6 h-6" />
-           </div>
-           <p className="text-4xl font-bold text-emerald-700 mt-2">{stats.AVAILABLE}</p>
-           <p className="text-sm text-emerald-600 mt-2">Propiedades en oferta</p>
+          <div className="flex justify-between">
+            <p className="text-emerald-800 font-bold">Disponibles</p>
+            <Building2 className="text-emerald-600 w-6 h-6" />
+          </div>
+          <p className="text-4xl font-bold text-emerald-700 mt-2">{stats.AVAILABLE}</p>
+          <p className="text-sm text-emerald-600 mt-2">Propiedades en oferta</p>
         </div>
 
         <div className="bg-amber-50 p-6 rounded-2xl shadow-sm border border-amber-100">
-           <div className="flex justify-between">
-             <p className="text-amber-800 font-bold">Aviso Entrega</p>
-             <Clock className="text-amber-600 w-6 h-6" />
-           </div>
-           <p className="text-4xl font-bold text-amber-700 mt-2">{stats.NOTICE}</p>
-           <p className="text-sm text-amber-600 mt-2">Próximas a liberarse</p>
+          <div className="flex justify-between">
+            <p className="text-amber-800 font-bold">Aviso Entrega</p>
+            <Clock className="text-amber-600 w-6 h-6" />
+          </div>
+          <p className="text-4xl font-bold text-amber-700 mt-2">{stats.NOTICE}</p>
+          <p className="text-sm text-amber-600 mt-2">Próximas a liberarse</p>
         </div>
 
-        <div 
+        <div
           className="bg-red-50 p-6 rounded-2xl shadow-sm border border-red-100 cursor-pointer hover:shadow-md transition-all"
           onClick={() => setActiveTab('alerts')}
         >
-           <div className="flex justify-between">
-             <p className="text-red-800 font-bold">Alertas</p>
-             <Bell className="text-red-600 w-6 h-6" />
-           </div>
-           <p className="text-4xl font-bold text-red-700 mt-2">{actionAlerts.length + staleProperties.length}</p>
-           <p className="text-sm text-red-600 mt-2">Requieren atención</p>
+          <div className="flex justify-between">
+            <p className="text-red-800 font-bold">Alertas</p>
+            <Bell className="text-red-600 w-6 h-6" />
+          </div>
+          <p className="text-4xl font-bold text-red-700 mt-2">
+            {actionAlerts.length + staleProperties.length}
+          </p>
+          <p className="text-sm text-red-600 mt-2">Requieren atención</p>
         </div>
       </div>
 
@@ -1187,55 +1278,68 @@ const Dashboard = ({ setActiveTab }: { setActiveTab: (tab: string) => void }) =>
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
         <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
           <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-            <Calendar className="w-5 h-5 text-slate-600" /> 
+            <Calendar className="w-5 h-5 text-slate-600" />
             Visitas Recientes (Últimos 7 días)
           </h3>
-          <button onClick={() => setActiveTab('visits')} className="text-sm text-amber-700 font-bold hover:underline">Ir a Bitácora</button>
+          <button
+            onClick={() => setActiveTab('visits')}
+            className="text-sm text-amber-700 font-bold hover:underline"
+          >
+            Ir a Bitácora
+          </button>
         </div>
         <div className="overflow-x-auto">
-           <table className="w-full text-left border-collapse">
-             <thead className="bg-slate-50 text-xs uppercase text-slate-500">
-               <tr>
-                 <th className="p-4 font-bold">Fecha</th>
-                 <th className="p-4 font-bold">Propiedad</th>
-                 <th className="p-4 font-bold">Cliente</th>
-                 <th className="p-4 font-bold">Ejecutivo</th>
-                 <th className="p-4 font-bold">Estado</th>
-               </tr>
-             </thead>
-             <tbody className="divide-y divide-slate-100 text-sm">
-               {recentVisits.length === 0 ? (
-                 <tr>
-                   <td colSpan={5} className="p-8 text-center text-slate-400">No se registraron visitas en los últimos 7 días.</td>
-                 </tr>
-               ) : (
-                 recentVisits.map(v => {
-                   const prop = properties.find(p => p.id === v.propertyId);
-                   return (
-                     <tr key={v.id} className="hover:bg-slate-50 transition-colors">
-                        <td className="p-4">
-                           <button 
-                             onClick={() => setViewVisit(v)} 
-                             className="font-bold text-amber-600 hover:underline flex items-center gap-1"
-                           >
-                             {v.date} <Eye className="w-3 h-3"/>
-                           </button>
-                        </td>
-                        <td className="p-4 font-medium text-slate-700">{prop?.address || v.propertyId}</td>
-                        <td className="p-4 text-slate-600">
-                          <div className="font-bold">{v.clientName}</div>
-                          {v.hasBroker && <div className="text-xs text-amber-600">Corredor: {v.brokerName}</div>}
-                        </td>
-                        <td className="p-4 text-slate-500">{v.executiveName}</td>
-                        <td className="p-4">
-                           <StatusBadge status={v.actionStatus} />
-                        </td>
-                     </tr>
-                   );
-                 })
-               )}
-             </tbody>
-           </table>
+          <table className="w-full text-left border-collapse">
+            <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+              <tr>
+                <th className="p-4 font-bold">Fecha</th>
+                <th className="p-4 font-bold">Propiedad</th>
+                <th className="p-4 font-bold">Cliente</th>
+                <th className="p-4 font-bold">Ejecutivo</th>
+                <th className="p-4 font-bold">Estado</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 text-sm">
+              {recentVisits.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="p-8 text-center text-slate-400">
+                    No se registraron visitas en los últimos 7 días.
+                  </td>
+                </tr>
+              ) : (
+                recentVisits.map((v) => {
+                  const prop = properties.find((p) => p.id === v.propertyId);
+                  return (
+                    <tr key={v.id} className="hover:bg-slate-50 transition-colors">
+                      <td className="p-4">
+                        <button
+                          onClick={() => setViewVisit(v)}
+                          className="font-bold text-amber-600 hover:underline flex items-center gap-1"
+                        >
+                          {v.date} <Eye className="w-3 h-3" />
+                        </button>
+                      </td>
+                      <td className="p-4 font-medium text-slate-700">
+                        {prop?.address || v.propertyId}
+                      </td>
+                      <td className="p-4 text-slate-600">
+                        <div className="font-bold">{v.clientName}</div>
+                        {v.hasBroker && (
+                          <div className="text-xs text-amber-600">
+                            Corredor: {v.brokerName}
+                          </div>
+                        )}
+                      </td>
+                      <td className="p-4 text-slate-500">{v.executiveName}</td>
+                      <td className="p-4">
+                        <StatusBadge status={v.actionStatus} />
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
 
@@ -1245,38 +1349,66 @@ const Dashboard = ({ setActiveTab }: { setActiveTab: (tab: string) => void }) =>
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
           <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
             <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-              <ClipboardList className="w-5 h-5 text-amber-600" /> 
+              <ClipboardList className="w-5 h-5 text-amber-600" />
               Compromisos Próximos (10 días)
             </h3>
-            <button onClick={() => setActiveTab('visits')} className="text-sm text-amber-700 font-bold hover:underline">Ver todo</button>
+            <button
+              onClick={() => setActiveTab('visits')}
+              className="text-sm text-amber-700 font-bold hover:underline"
+            >
+              Ver todo
+            </button>
           </div>
           <div className="divide-y divide-slate-100 max-h-[400px] overflow-y-auto">
-             {actionAlerts.length === 0 ? (
-               <div className="p-8 text-center text-slate-400">No hay compromisos pendientes cercanos.</div>
-             ) : (
-               actionAlerts.map((alert, i) => (
-                 <div key={i} className={`p-4 border-l-4 ${alert.status === 'URGENT' ? 'border-l-red-500 bg-red-50/30' : 'border-l-yellow-400'}`}>
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <span className={`text-xs font-bold px-2 py-0.5 rounded ${alert.status === 'URGENT' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                          {alert.status === 'URGENT' ? `VENCIDO (${Math.abs(alert.daysLeft)} días)` : `VENCE EN ${alert.daysLeft} DÍAS`}
-                        </span>
-                        <p className="font-semibold text-slate-800 mt-1 text-lg">{alert.visit.nextAction}</p>
-                        <p className="text-sm text-slate-600 mt-1">Cliente: {alert.visit.clientName}</p>
-                      </div>
-                      <div className="flex flex-col items-end gap-2">
-                        <p className="text-sm font-mono text-slate-500 bg-white px-2 py-1 rounded border">{alert.visit.nextActionDate}</p>
-                        <button 
-                          onClick={() => setSelectedVisitForAction(alert.visit)}
-                          className="bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-xs font-bold px-3 py-2 rounded-lg flex items-center gap-1 transition-colors shadow-sm"
-                        >
-                          <Edit className="w-3 h-3" /> EDITAR
-                        </button>
-                      </div>
+            {actionAlerts.length === 0 ? (
+              <div className="p-8 text-center text-slate-400">
+                No hay compromisos pendientes cercanos.
+              </div>
+            ) : (
+              actionAlerts.map((alert, i) => (
+                <div
+                  key={i}
+                  className={`p-4 border-l-4 ${
+                    alert.status === 'URGENT'
+                      ? 'border-l-red-500 bg-red-50/30'
+                      : 'border-l-yellow-400'
+                  }`}
+                >
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <span
+                        className={`text-xs font-bold px-2 py-0.5 rounded ${
+                          alert.status === 'URGENT'
+                            ? 'bg-red-100 text-red-700'
+                            : 'bg-yellow-100 text-yellow-700'
+                        }`}
+                      >
+                        {alert.status === 'URGENT'
+                          ? `VENCIDO (${Math.abs(alert.daysLeft)} días)`
+                          : `VENCE EN ${alert.daysLeft} DÍAS`}
+                      </span>
+                      <p className="font-semibold text-slate-800 mt-1 text-lg">
+                        {alert.visit.nextAction}
+                      </p>
+                      <p className="text-sm text-slate-600 mt-1">
+                        Cliente: {alert.visit.clientName}
+                      </p>
                     </div>
-                 </div>
-               ))
-             )}
+                    <div className="flex flex-col items-end gap-2">
+                      <p className="text-sm font-mono text-slate-500 bg-white px-2 py-1 rounded border">
+                        {alert.visit.nextActionDate}
+                      </p>
+                      <button
+                        onClick={() => setSelectedVisitForAction(alert.visit)}
+                        className="bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-xs font-bold px-3 py-2 rounded-lg flex items-center gap-1 transition-colors shadow-sm"
+                      >
+                        <Edit className="w-3 h-3" /> EDITAR
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </div>
 
@@ -1284,42 +1416,61 @@ const Dashboard = ({ setActiveTab }: { setActiveTab: (tab: string) => void }) =>
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
           <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
             <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-              <History className="w-5 h-5 text-orange-600" /> 
+              <History className="w-5 h-5 text-orange-600" />
               Stock Sin Movimiento ({'>'}30 días)
             </h3>
-            <button onClick={() => setActiveTab('stale')} className="text-sm text-amber-700 font-bold hover:underline">Ver todo</button>
+            <button
+              onClick={() => setActiveTab('stale')}
+              className="text-sm text-amber-700 font-bold hover:underline"
+            >
+              Ver todo
+            </button>
           </div>
-           <div className="divide-y divide-slate-100 max-h-[400px] overflow-y-auto">
-             {staleProperties.length === 0 ? (
-               <div className="p-8 text-center text-slate-400">Todo el stock tiene movimiento reciente.</div>
-             ) : (
-               staleProperties.map((p, i) => (
-                 <div key={i} className="p-4 hover:bg-slate-50 cursor-pointer" onClick={() => setActiveTab('stale')}>
-                    <div className="flex justify-between items-center">
-                      <div>
-                        <p className="font-bold text-slate-800 text-lg">{p.address}</p>
-                        <p className="text-sm text-slate-500">{p.commune} • {formatUF(p.priceUF)}</p>
-                      </div>
-                      <div className="text-right">
-                         <span className="bg-orange-100 text-orange-700 text-xs font-bold px-2 py-1 rounded">SIN VISITAS</span>
-                      </div>
+          <div className="divide-y divide-slate-100 max-h-[400px] overflow-y-auto">
+            {staleProperties.length === 0 ? (
+              <div className="p-8 text-center text-slate-400">
+                Todo el stock tiene movimiento reciente.
+              </div>
+            ) : (
+              staleProperties.map((p, i) => (
+                <div
+                  key={i}
+                  className="p-4 hover:bg-slate-50 cursor-pointer"
+                  onClick={() => setActiveTab('stale')}
+                >
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <p className="font-bold text-slate-800 text-lg">
+                        {p.address}
+                      </p>
+                      <p className="text-sm text-slate-500">
+                        {p.commune} • {formatUF(p.priceUF)}
+                      </p>
                     </div>
-                 </div>
-               ))
-             )}
+                    <div className="text-right">
+                      <span className="bg-orange-100 text-orange-700 text-xs font-bold px-2 py-1 rounded">
+                        SIN VISITAS (&gt; 30 días)
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </div>
       </div>
 
       {/* Modals */}
       {selectedVisitForAction && (
-        <ActionModal 
-          visit={selectedVisitForAction} 
-          onClose={() => setSelectedVisitForAction(null)} 
+        <ActionModal
+          visit={selectedVisitForAction}
+          onClose={() => setSelectedVisitForAction(null)}
           onUpdate={refreshAlerts}
         />
       )}
-      {viewVisit && <VisitDetailModal visit={viewVisit} onClose={() => setViewVisit(null)} />}
+      {viewVisit && (
+        <VisitDetailModal visit={viewVisit} onClose={() => setViewVisit(null)} />
+      )}
     </div>
   );
 };
@@ -1341,12 +1492,70 @@ const PropertiesPage = ({
       maximumFractionDigits: 0,
     });
   };
+const [properties, setProperties] = useState<Property[]>([]);
+const [visits, setVisits] = useState<Visit[]>(Service.getVisits());
+const [filterStatus, setFilterStatus] = useState<string>('ALL');
+const [search, setSearch] = useState('');
+const [sortPriority, setSortPriority] = useState(false);
 
-  const [properties, setProperties] = useState<Property[]>(Service.getProperties());
-  const [visits, setVisits] = useState<Visit[]>(Service.getVisits());
-  const [filterStatus, setFilterStatus] = useState<string>('ALL');
-  const [search, setSearch] = useState('');
-  const [sortPriority, setSortPriority] = useState(false);
+// 🔹 Cargar propiedades desde Supabase al iniciar la página
+useEffect(() => {
+  const loadProps = async () => {
+    try {
+      const fromDb = await Services.fetchPropertiesFromSupabase();
+      console.log('Propiedades desde Supabase:', fromDb);
+
+      if (!fromDb || fromDb.length === 0) {
+        console.warn('Supabase no devolvió propiedades');
+        return; // dejamos properties como []
+      }
+
+      // Adaptar columnas de la BD al formato que usa tu app
+      const mapped: Property[] = fromDb.map((p: any) => ({
+        id: p.id,
+        address: p.address || '',
+        commune: p.comuna || '',
+        type: p.property_type || 'Oficina',
+        owner: p.owner_name || '',
+        condominium: p.condominium_name || '',
+        priceUF: p.arriendo_publicacion_uf || 0,
+        landM2: p.superficie_terreno || 0,
+        builtM2: p.superficie_construida || 0,
+        storageM2: p.superficie_bodega || 0,
+
+        // Estado de BD -> estado de la app
+        status:
+          p.status === 'Disponible'
+            ? 'AVAILABLE'
+            : p.status === 'Arrendado'
+            ? 'LEASED'
+            : p.status === 'Aviso entrega'
+            ? 'NOTICE_GIVEN'
+            : 'AVAILABLE',
+
+        vacancyStartDate: p.fecha_disponible_desde || '',
+
+        // Campos que tu BD aún no tiene
+        noticeEndDate: '',
+        leaseStartDate: '',
+        leaseEndDate: '',
+        currentTenant: '',
+        leaseType: 'FIXED',
+
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      }));
+
+      setProperties(mapped);
+    } catch (err) {
+      console.error('Error cargando propiedades desde Supabase:', err);
+    }
+  };
+
+  loadProps();
+}, []);
+
+
   
   // Modal States
   const [isModalOpen, setIsModalOpen] = useState(false);
