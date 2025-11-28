@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
+import MapaNew from "./MapaNew";
 import { 
   LayoutDashboard, 
   Building2, 
@@ -3233,6 +3234,23 @@ const todayStr = new Date().toLocaleDateString('es-CL');
       <span>Informes</span>
     </button>
 
+{/* Mapa de Inversiones */}
+<button
+  onClick={() => setActiveTab('investment-map')}
+  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all
+    ${
+      activeTab === 'investment-map'
+        ? 'bg-sky-600 text-white shadow-lg'
+        : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+    }`}
+>
+  <span className="w-9 h-9 rounded-xl bg-slate-800 flex items-center justify-center">
+    <MapPin className="w-4 h-4" />
+  </span>
+  <span>Mapa de Inversiones</span>
+</button>
+
+
     {/* Alertas Stock */}
     <button
       onClick={() => setActiveTab('stale')}
@@ -3304,8 +3322,8 @@ const todayStr = new Date().toLocaleDateString('es-CL');
 
         <div className="p-6 md:p-10 max-w-7xl mx-auto pb-20">
           {activeTab === 'dashboard' && <Dashboard setActiveTab={setActiveTab} />}
-          {activeTab === 'properties' && (<PropertiesPage user={user} ufValue={ufValue} />
-)}
+          {activeTab === 'properties' && (<PropertiesPage user={user} ufValue={ufValue} />)}
+{activeTab === 'investment-map' && <MapaNew />}
           {activeTab === 'visits' && <VisitsPage />}
           {activeTab === 'reports' && <ReportsPage />}
           {activeTab === 'alerts' && <Dashboard setActiveTab={setActiveTab} />} {/* Redirect to dashboard for now */}
@@ -3335,4 +3353,4 @@ const todayStr = new Date().toLocaleDateString('es-CL');
     </div>
   );
 };
-export default App
+export default App;
