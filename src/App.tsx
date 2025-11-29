@@ -2351,11 +2351,11 @@ const VisitsPage = () => {
     actionStatus: 'PENDING',
   };
   const [formData, setFormData] = useState<Partial<Visit>>(initialForm);
+ const [editingVisit, setEditingVisit] = useState<Visit | null>(null);
 
   const refreshVisits = () => {
     setVisits(Service.getVisits());
   };
-
 
 const handleAddVisit = async (e: React.FormEvent) => {
   e.preventDefault();
@@ -2365,36 +2365,61 @@ const handleAddVisit = async (e: React.FormEvent) => {
     return;
   }
 
-  // 1) Crea la visita igual que antes (para tu app local)
+  // 🟡 MODO EDICIÓN
+  if (editingVisit) {
+    const updatedVisit: Visit = {
+      ...editingVisit,
+      ...formData as Visit,
+      id: editingVisit.id, // preservamos el mismo id
+      createdAt: editingVisit.createdAt,
+    };
+
+    // 1) Actualizar en localStorage
+    const current = Service.getVisits().map(v =>
+      v.id === updatedVisit.id ? updatedVisit : v
+    );
+    localStorage.setItem(STORAGE_KEYS.VISITS, JSON.stringify(current));
+    setVisits(current);
+
+    // 2) Actualizar también en Supabase
+    try {
+      await VisitsSupabaseService.updateVisitByAppId(updatedVisit);
+      console.log('✅ Visita actualizada también en Supabase');
+    } catch (err) {
+      console.error('❌ No se pudo actualizar la visita en Supabase', err);
+    }
+
+    setIsModalOpen(false);
+    setFormData(initialForm);
+    setEditingVisit(null);
+    return;
+  }
+
+  // 🔵 MODO CREACIÓN (lo que ya hacías antes)
   const newVisit: Visit = {
     ...formData as Visit,
     id: `V-${Math.floor(Math.random() * 90000) + 10000}`,
     createdAt: new Date().toISOString(),
   };
 
-  // 2) Guarda en localStorage (lo que ya funcionaba)
+  // 2) Guarda en localStorage
   Service.addVisit(newVisit);
   refreshVisits();
 
   // 3) Además, intenta guardar una copia en Supabase
   try {
     await VisitsSupabaseService.createVisit({
-      // 👇 muy importante: mandamos el id que usa tu app (V-xxxxx)
       id: newVisit.id,
-
       propertyId: newVisit.propertyId,
       date: newVisit.date,
       executiveName: newVisit.executiveName,
-
       clientName: newVisit.clientName,
       clientPhone: newVisit.clientPhone,
       clientEmail: newVisit.clientEmail,
-
       offerUF: newVisit.offerUF,
       hasBroker: newVisit.hasBroker,
       brokerName: newVisit.brokerName,
       comments: newVisit.comments,
-
       nextAction: newVisit.nextAction,
       nextActionDate: newVisit.nextActionDate,
       actionStatus: newVisit.actionStatus,
@@ -2405,11 +2430,19 @@ const handleAddVisit = async (e: React.FormEvent) => {
     console.log('✅ Visita guardada también en Supabase');
   } catch (err) {
     console.error('❌ No se pudo guardar la visita en Supabase', err);
-    // alert('La visita se guardó en la app, pero falló la conexión a Supabase');
   }
 
   setIsModalOpen(false);
   setFormData(initialForm);
+};
+
+
+const handleEditVisitClick = (visit: Visit) => {
+  setEditingVisit(visit);
+  setFormData({
+    ...visit,
+  });
+  setIsModalOpen(true);
 };
 
 
@@ -2477,12 +2510,17 @@ const handleAddVisit = async (e: React.FormEvent) => {
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between md:items-center gap-4">
         <h2 className="text-2xl font-bold text-slate-900">Bitácora de Visitas</h2>
-        <button
-          onClick={() => setIsModalOpen(true)}
-          className="bg-sky-600 hover:bg-sky-700 text-white px-6 py-3 rounded-xl flex items-center gap-2 text-sm md:text-base font-semibold shadow-md transition-colors"
-        >
-          <Plus className="w-5 h-5" /> Registrar Visita
-        </button>
+       <button
+  onClick={() => {
+    setEditingVisit(null);
+    setFormData(initialForm);
+    setIsModalOpen(true);
+  }}
+  className="bg-sky-600 hover:bg-sky-700 text-white px-6 py-3 rounded-xl flex items-center gap-2 text-sm md:text-base font-semibold shadow-md transition-colors"
+>
+  <Plus className="w-5 h-5" /> Registrar Visita
+</button>
+
       </div>
 
       {/* Filtros de búsqueda */}
@@ -2564,6 +2602,7 @@ const handleAddVisit = async (e: React.FormEvent) => {
               key={v.id}
               className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all flex flex-col md:flex-row gap-6"
             >
+              {/* Columna izquierda: info de la visita */}
               <div className="flex-1 space-y-2">
                 <div className="flex items-center gap-3">
                   <span className="font-semibold text-sky-700 bg-sky-50 px-2 py-1 rounded text-xs">
@@ -2601,7 +2640,8 @@ const handleAddVisit = async (e: React.FormEvent) => {
                 </div>
               </div>
 
-              <div className="md:w-72 border-t md:border-t-0 md:border-l border-slate-100 pt-4 md:pt-0 md:pl-6 flex flex-col justify-center">
+              {/* Columna derecha: compromiso + botones */}
+              <div className="md:w-72 border-t md:border-t-0 md:border-l border-slate-100 pt-4 md:pt-0 md:pl-6 flex flex-col">
                 <div className="mb-3">
                   <label className="text-xs font-bold text-slate-400 uppercase block mb-1">
                     Compromiso Actual
@@ -2616,14 +2656,15 @@ const handleAddVisit = async (e: React.FormEvent) => {
                     Fecha: {v.nextActionDate}
                   </p>
                 </div>
+<div className="grid grid-cols-2 gap-2 mt-4">
 
-                <div className="flex gap-2 mt-auto">
                   <button
                     onClick={() => setViewVisit(v)}
                     className="flex-1 py-2 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg flex items-center justify-center gap-1"
                   >
                     <Eye className="w-3 h-3" /> Ver Detalle
                   </button>
+
                   <button
                     onClick={() => setSelectedVisitForAction(v)}
                     className="flex-1 py-2 px-3 bg-sky-50 hover:bg-sky-100 text-sky-700 text-xs font-semibold rounded-lg flex items-center justify-center gap-1"
@@ -2632,12 +2673,18 @@ const handleAddVisit = async (e: React.FormEvent) => {
                   </button>
 
                   <button
-  onClick={() => handleDeleteVisit(v)}
-  className="flex-1 py-2 px-3 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-semibold rounded-lg flex items-center justify-center gap-1"
->
-  🗑 Eliminar
-</button>
+                    onClick={() => handleEditVisitClick(v)}
+                    className="flex-1 py-2 px-3 bg-amber-50 hover:bg-amber-100 text-amber-700 text-xs font-semibold rounded-lg flex items-center justify-center gap-1"
+                  >
+                    ✏️ Editar
+                  </button>
 
+                  <button
+                    onClick={() => handleDeleteVisit(v)}
+                    className="flex-1 py-2 px-3 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-semibold rounded-lg flex items-center justify-center gap-1"
+                  >
+                    🗑 Eliminar
+                  </button>
                 </div>
               </div>
             </div>
@@ -2651,13 +2698,15 @@ const handleAddVisit = async (e: React.FormEvent) => {
         )}
       </div>
 
+
       {/* MODAL: Nueva visita */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-50 p-4 backdrop-blur-sm overflow-y-auto">
           <div className="bg-white rounded-2xl max-w-2xl w-full p-8 shadow-2xl max-h-[90vh] overflow-y-auto">
-            <h3 className="text-2xl font-bold text-slate-900 mb-6 border-b pb-4">
-              Registrar Nueva Visita
-            </h3>
+           <h3 className="text-2xl font-bold text-slate-900 mb-6 border-b pb-4">
+  {editingVisit ? 'Editar Visita' : 'Registrar Nueva Visita'}
+</h3>
+
 
             <form onSubmit={handleAddVisit} className="space-y-6">
               {/* Datos básicos */}
@@ -2886,11 +2935,12 @@ const handleAddVisit = async (e: React.FormEvent) => {
                   Cancelar
                 </button>
                 <button
-                  type="submit"
-                  className="flex-1 py-3 bg-sky-600 text-white font-bold rounded-xl hover:bg-sky-700 shadow-lg"
-                >
-                  Registrar Visita
-                </button>
+  type="submit"
+  className="flex-1 py-3 bg-sky-600 text-white font-bold rounded-xl hover:bg-sky-700 shadow-lg"
+>
+  {editingVisit ? 'Guardar Cambios' : 'Registrar Visita'}
+</button>
+
               </div>
             </form>
           </div>
