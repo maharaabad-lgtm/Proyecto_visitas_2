@@ -19,13 +19,13 @@ export const Services = {
   },
 };
 
-// 🔹 Tipos básicos para visitas
+// ---- VISITAS EN SUPABASE ----
+
 type Visit = { [key: string]: any };
 type NewVisit = { [key: string]: any };
 
-// 🔹 Servicio para VISITAS (Supabase)
 export const VisitsSupabaseService = {
-  // 1) Obtener visitas desde Supabase
+  // 1) Obtener visitas desde Supabase (por si después las quieres usar)
   async getVisits(): Promise<Visit[]> {
     const { data, error } = await supabase
       .from('visits')
@@ -43,6 +43,9 @@ export const VisitsSupabaseService = {
   // 2) Crear nueva visita en Supabase
   async createVisit(newVisit: NewVisit): Promise<void> {
     const { error } = await supabase.from('visits').insert({
+      // 👇 este es el id de TU app (V-12345)
+      visit_id: newVisit.id,
+
       property_id: newVisit.propertyId,
       date: newVisit.date,
       executive_name: newVisit.executiveName,
@@ -66,6 +69,41 @@ export const VisitsSupabaseService = {
 
     if (error) {
       console.error('Error creando visita en Supabase', error);
+      throw error;
+    }
+  },
+
+  // 3) Borrar visita en Supabase usando el id de la app
+  async deleteVisitByAppId(visitId: string): Promise<void> {
+    const { error } = await supabase
+      .from('visits')
+      .delete()
+      .eq('visit_id', visitId);
+
+    if (error) {
+      console.error('Error borrando visita en Supabase', error);
+      throw error;
+    }
+  },
+
+  // 4) Actualizar visita en Supabase (compromiso / estado / comentarios)
+  async updateVisitByAppId(updatedVisit: Visit): Promise<void> {
+    const { id } = updatedVisit; // este es el V-12345
+
+    const { error } = await supabase
+      .from('visits')
+      .update({
+        next_action: updatedVisit.nextAction,
+        next_action_date: updatedVisit.nextActionDate,
+        action_status: updatedVisit.actionStatus,
+        action_completed_date: updatedVisit.actionCompletedDate || null,
+        comments: updatedVisit.comments,
+        history: updatedVisit.history || [],
+      })
+      .eq('visit_id', id);
+
+    if (error) {
+      console.error('Error actualizando visita en Supabase', error);
       throw error;
     }
   },

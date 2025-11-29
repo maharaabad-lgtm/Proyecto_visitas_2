@@ -2379,6 +2379,9 @@ const handleAddVisit = async (e: React.FormEvent) => {
   // 3) Además, intenta guardar una copia en Supabase
   try {
     await VisitsSupabaseService.createVisit({
+      // 👇 muy importante: mandamos el id que usa tu app (V-xxxxx)
+      id: newVisit.id,
+
       propertyId: newVisit.propertyId,
       date: newVisit.date,
       executiveName: newVisit.executiveName,
@@ -2402,14 +2405,15 @@ const handleAddVisit = async (e: React.FormEvent) => {
     console.log('✅ Visita guardada también en Supabase');
   } catch (err) {
     console.error('❌ No se pudo guardar la visita en Supabase', err);
-    // Opcional: mostrar mensaje al usuario
     // alert('La visita se guardó en la app, pero falló la conexión a Supabase');
   }
 
   setIsModalOpen(false);
   setFormData(initialForm);
 };
-  const handleDeleteVisit = async (visit: Visit) => {
+
+
+   const handleDeleteVisit = async (visit: Visit) => {
     const ok = window.confirm(
       `¿Seguro que quieres borrar la visita de ${visit.clientName} a la propiedad ${visit.propertyId}?`
     );
@@ -2420,20 +2424,16 @@ const handleAddVisit = async (e: React.FormEvent) => {
     localStorage.setItem(STORAGE_KEYS.VISITS, JSON.stringify(current));
     setVisits(current);
 
-    // 2) Intentar borrar también en Supabase (no detiene la app si falla)
+    // 2) Intentar borrar también en Supabase por ID de la visita
     try {
-      await VisitsSupabaseService.deleteVisit({
-        propertyId: visit.propertyId,
-        date: visit.date,
-        executiveName: visit.executiveName,
-        clientName: visit.clientName,
-      });
+      await VisitsSupabaseService.deleteVisitByAppId(visit.id);
       console.log('✅ Visita borrada también en Supabase');
     } catch (err) {
       console.error('❌ No se pudo borrar la visita en Supabase', err);
       // Si quieres: alert('Se borró en la app, pero falló Supabase');
     }
   };
+ 
 
 
 
@@ -2470,7 +2470,7 @@ const handleAddVisit = async (e: React.FormEvent) => {
         (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
       ),
     [filteredVisits]
-  );
+    );
 
   return (
     <div className="space-y-6">
@@ -2630,7 +2630,7 @@ const handleAddVisit = async (e: React.FormEvent) => {
                   >
                     <Edit className="w-3 h-3" /> Gestionar
                   </button>
-                  
+
                   <button
   onClick={() => handleDeleteVisit(v)}
   className="flex-1 py-2 px-3 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-semibold rounded-lg flex items-center justify-center gap-1"
