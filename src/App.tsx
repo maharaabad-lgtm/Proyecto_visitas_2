@@ -2409,6 +2409,32 @@ const handleAddVisit = async (e: React.FormEvent) => {
   setIsModalOpen(false);
   setFormData(initialForm);
 };
+  const handleDeleteVisit = async (visit: Visit) => {
+    const ok = window.confirm(
+      `¿Seguro que quieres borrar la visita de ${visit.clientName} a la propiedad ${visit.propertyId}?`
+    );
+    if (!ok) return;
+
+    // 1) Borrar en la app (localStorage)
+    const current = Service.getVisits().filter(v => v.id !== visit.id);
+    localStorage.setItem(STORAGE_KEYS.VISITS, JSON.stringify(current));
+    setVisits(current);
+
+    // 2) Intentar borrar también en Supabase (no detiene la app si falla)
+    try {
+      await VisitsSupabaseService.deleteVisit({
+        propertyId: visit.propertyId,
+        date: visit.date,
+        executiveName: visit.executiveName,
+        clientName: visit.clientName,
+      });
+      console.log('✅ Visita borrada también en Supabase');
+    } catch (err) {
+      console.error('❌ No se pudo borrar la visita en Supabase', err);
+      // Si quieres: alert('Se borró en la app, pero falló Supabase');
+    }
+  };
+
 
 
   // FILTRO + ORDEN de visitas
@@ -2604,6 +2630,14 @@ const handleAddVisit = async (e: React.FormEvent) => {
                   >
                     <Edit className="w-3 h-3" /> Gestionar
                   </button>
+                  
+                  <button
+  onClick={() => handleDeleteVisit(v)}
+  className="flex-1 py-2 px-3 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-semibold rounded-lg flex items-center justify-center gap-1"
+>
+  🗑 Eliminar
+</button>
+
                 </div>
               </div>
             </div>
