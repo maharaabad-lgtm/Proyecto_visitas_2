@@ -34,6 +34,8 @@ import {
 } from 'lucide-react';
 
 import { Services } from './services';
+import { VisitsSupabaseService } from './services';
+
 
 
 // --- CONSTANTS & LISTS ---
@@ -2267,7 +2269,9 @@ const PropertiesPage = ({
 // 3. VISITS PAGE
 const VisitsPage = () => {
   const [visits, setVisits] = useState<Visit[]>(Service.getVisits());
-  const [properties] = useState<Property[]>(Service.getProperties());
+
+  // 🔹 Ahora las propiedades parten vacías y se llenan desde Supabase
+  const [properties, setProperties] = useState<Property[]>([]);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [viewVisit, setViewVisit] = useState<Visit | null>(null);
@@ -2285,7 +2289,61 @@ const VisitsPage = () => {
     new Set(USERS.filter(u => u.role !== 'ADMIN').map(u => u.name))
   );
 
-  // New Visit Form State
+  // 🔹 Cargar propiedades desde Supabase (con backup local si falla)
+  useEffect(() => {
+    const loadProps = async () => {
+      try {
+        const fromDb = await Services.fetchPropertiesFromSupabase();
+        console.log('VisitsPage – propiedades desde Supabase:', fromDb);
+
+        if (!fromDb || fromDb.length === 0) {
+          console.warn('Supabase no devolvió propiedades en VisitsPage, uso backup local');
+          setProperties(Service.getProperties());
+          return;
+        }
+
+        // 👇 Adaptamos los campos de Supabase al formato de tu app
+        const mapped: Property[] = fromDb.map((p: any) => ({
+          id: p.id,
+          address: p.address || p.property_name || '',
+          commune: p.comuna || '',
+          type: p.property_type || 'Oficina',
+          owner: p.owner_name || '',
+          condominium: p.condominium_name || '',
+          priceUF: p.arriendo_publicacion_uf || 0,
+          landM2: p.superficie_terreno || 0,
+          builtM2: p.superficie_construida || 0,
+          storageM2: p.superficie_bodega || 0,
+          status:
+            p.status === 'Disponible' || p.status === 'DISPONIBLE'
+              ? 'AVAILABLE'
+              : p.status === 'Arrendado' || p.status === 'ARRENDADO'
+              ? 'LEASED'
+              : p.status === 'Aviso entrega' || p.status === 'AVISO ENTREGA'
+              ? 'NOTICE_GIVEN'
+              : 'AVAILABLE',
+          vacancyStartDate: p.fecha_disponible_desde || '',
+          noticeEndDate: '',
+          leaseStartDate: '',
+          leaseEndDate: '',
+          currentTenant: '',
+          leaseType: 'FIXED',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        }));
+
+        setProperties(mapped);
+      } catch (err) {
+        console.error('VisitsPage – error al cargar propiedades desde Supabase:', err);
+        // Si algo falla, volvemos a las propiedades locales (incluyen las demo)
+        setProperties(Service.getProperties());
+      }
+    };
+
+    loadProps();
+  }, []);
+
+  // 🔹 Estado inicial del formulario
   const initialForm: Partial<Visit> = {
     date: new Date().toISOString().split('T')[0],
     executiveName: executives[0] || 'Juan Pérez',
@@ -2298,24 +2356,60 @@ const VisitsPage = () => {
     setVisits(Service.getVisits());
   };
 
-  const handleAddVisit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formData.propertyId) {
-      alert('Seleccione una propiedad');
-      return;
-    }
 
-    const newVisit: Visit = {
-      ...formData as Visit,
-      id: `V-${Math.floor(Math.random() * 90000) + 10000}`,
-      createdAt: new Date().toISOString(),
-    };
+const handleAddVisit = async (e: React.FormEvent) => {
+  e.preventDefault();
 
-    Service.addVisit(newVisit);
-    refreshVisits();
-    setIsModalOpen(false);
-    setFormData(initialForm);
+  if (!formData.propertyId) {
+    alert('Seleccione una propiedad');
+    return;
+  }
+
+  // 1) Crea la visita igual que antes (para tu app local)
+  const newVisit: Visit = {
+    ...formData as Visit,
+    id: `V-${Math.floor(Math.random() * 90000) + 10000}`,
+    createdAt: new Date().toISOString(),
   };
+
+  // 2) Guarda en localStorage (lo que ya funcionaba)
+  Service.addVisit(newVisit);
+  refreshVisits();
+
+  // 3) Además, intenta guardar una copia en Supabase
+  try {
+    await VisitsSupabaseService.createVisit({
+      propertyId: newVisit.propertyId,
+      date: newVisit.date,
+      executiveName: newVisit.executiveName,
+
+      clientName: newVisit.clientName,
+      clientPhone: newVisit.clientPhone,
+      clientEmail: newVisit.clientEmail,
+
+      offerUF: newVisit.offerUF,
+      hasBroker: newVisit.hasBroker,
+      brokerName: newVisit.brokerName,
+      comments: newVisit.comments,
+
+      nextAction: newVisit.nextAction,
+      nextActionDate: newVisit.nextActionDate,
+      actionStatus: newVisit.actionStatus,
+      actionCompletedDate: newVisit.actionCompletedDate,
+      history: newVisit.history || [],
+    });
+
+    console.log('✅ Visita guardada también en Supabase');
+  } catch (err) {
+    console.error('❌ No se pudo guardar la visita en Supabase', err);
+    // Opcional: mostrar mensaje al usuario
+    // alert('La visita se guardó en la app, pero falló la conexión a Supabase');
+  }
+
+  setIsModalOpen(false);
+  setFormData(initialForm);
+};
+
 
   // FILTRO + ORDEN de visitas
   const filteredVisits = useMemo(() => {
